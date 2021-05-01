@@ -1,7 +1,7 @@
 # kvm-manage
 
 ## 介绍
-批量克隆与修改KVM虚拟机。适合小企业使用。
+批量克隆、修改、删除KVM虚拟机。适合小企业使用。
 
 ### 功能如下：
 - 克隆虚拟机：通过编辑list.csv文件定义虚拟机信息，然后运行vm-clone.sh，选择克隆模板，然后按照list.csv清单克隆出想要的虚拟机
@@ -9,10 +9,10 @@
 - 批量删除虚拟机指定虚拟机
 - 通过清单选择要删除的虚拟机
 
-### 你若喜欢，请为她完成几个小心愿：
+### 喜欢她，就满足她：
 1. 【Star】她，让她看到你是爱她的；
-3. 【Issue】她，告诉我她有哪些小脾气；
-2. 【Fork】她，为她增加新功能，修Bug，让她更有内涵；
+3. 【Issue】她，告诉她有哪些小脾气，她会改的，手动小绵羊；
+2. 【Fork】她，为她增加新功能，修Bug，让她更加卡哇伊；
 4. 【打赏】她，为她买jk；
 <img src="https://img-blog.csdnimg.cn/20210429155627295.jpg?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3poZl9zeQ==,size_16,color_FFFFFF,t_70#pic_center" alt="打赏" style="zoom:50%;" />
 
