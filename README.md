@@ -14,7 +14,7 @@
 3. 【Issue】她，告诉我她有哪些小脾气；
 2. 【Fork】她，为她增加新功能，修Bug，让她更有内涵；
 4. 【打赏】她，为她买jk；
-![打赏](https://)
+![打赏](https://gitee.com/zhf_sy/kvm-manage/blob/master/dao.jpg)
 
 ## 软件架构
 Linux shell
