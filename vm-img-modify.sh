@@ -6,12 +6,18 @@
 #############################################################################
 
 
-# 虚拟机模板ENV（根据实际情况修改）
-## 【/】逻辑卷
-#MODEL_VM_LV='/dev/m-ubu-1604-vg/root'
-#MODEL_VM_LV='/dev/mapper/centos-root'
-MODEL_VM_LV='/dev/mapper/cl-root'
-## 网卡
+# sh
+SH_NAME=${0##*/}
+SH_PATH=$( cd "$( dirname "$0" )" && pwd )
+cd ${SH_PATH}
+
+# 引入env
+. ${SH_PATH}/kvm.env
+#MODEL_VM_LV='/dev/mapper/cl-root'
+
+
+
+# 网卡
 MODEL_VM_NET_1_FILE='/etc/sysconfig/network-scripts/ifcfg-eth0'   #--- centos 7
 
 

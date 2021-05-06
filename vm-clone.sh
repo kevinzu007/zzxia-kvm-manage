@@ -6,9 +6,15 @@
 #############################################################################
 
 
-# 指定ENV
-VM_IMG_PATH='/var/lib/libvirt/images'    #--- 新虚拟机文件路径
-VM_XML_PATH='/etc/libvirt/qemu'          #--- 虚拟机配置文件路径，系统默认路径
+# sh
+SH_NAME=${0##*/}
+SH_PATH=$( cd "$( dirname "$0" )" && pwd )
+cd ${SH_PATH}
+
+# 引入env
+. ${SH_PATH}/kvm.env
+#VM_IMG_PATH='/var/lib/libvirt/images'    #--- 新虚拟机文件路径
+#VM_XML_PATH='/etc/libvirt/qemu'          #--- 虚拟机配置文件路径，系统默认路径
 
 
 F_HELP()
