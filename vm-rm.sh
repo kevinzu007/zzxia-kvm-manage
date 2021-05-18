@@ -6,6 +6,16 @@
 #############################################################################
 
 
+# sh
+SH_NAME=${0##*/}
+SH_PATH=$( cd "$( dirname "$0" )" && pwd )
+cd ${SH_PATH}
+
+# 引入env
+. ${SH_PATH}/kvm.env
+#QUIET_DELETE_IMG='yes'
+
+
 F_HELP()
 {
     echo "
@@ -34,10 +44,11 @@ F_HELP()
 
 RM_VM ()
 {
-    echo "rm $VM_NAME ......"
+    echo "------------------------------"
+    echo "删除虚拟机：$VM_NAME ......"
 
     # vm ? exist
-    virsh list --all | grep "${VM_NAME}"
+    virsh list --all | grep -q "${VM_NAME}"
     ERR1=$?
     if [ $ERR1 != 0 ]; then
         echo "${VM_NAME} NOT exist !"
@@ -59,17 +70,28 @@ RM_VM ()
         virsh destroy "${VM_NAME}"
     fi
 
+    # rm img
+    N=$( virsh  dumpxml  --domain "${VM_NAME}"  | grep  "<disk type='file' device='disk'>" | wc -l )
+    for ((i=1;i<=N;i++));
+    do
+        IMG_FILE=$( virsh  dumpxml  --domain "${VM_NAME}"  | grep -A2  "<disk type='file' device='disk'>" | sed -n '3p' | awk -F "'" '{print $2}' )
+        #
+        if [ "${QUIET_DELETE_IMG}" = "yes"  -a  -n "${IMG_FILE}" ]; then
+            rm  -f "${IMG_FILE}"
+            echo 'OK，已删除'
+        elif [ "${QUIET_DELETE_IMG}" != "yes"  -a  -n "${IMG_FILE}" ]; then
+            read -t 30 -p "重要提示：需要删除虚拟机镜像文件【${IMG_FILE}】，默认[no]，(yes|no)：" AK
+            if [ "x${AK}" = 'xyes' ]; then
+                rm  -f "${IMG_FILE}"
+                echo 'OK，已删除'
+            else
+                echo -e "\n超时，跳过\n"
+            fi
+        fi
+    done
+
     # undefine VM ,this will delete xml
     virsh undefine "${VM_NAME}"
-
-    # rm img
-    rm "/var/lib/libvirt/images/${VM_NAME}.img"
-    RM_ERR=$?
-    if [ ${RM_ERR} = 0 ]; then
-        echo rm OK!
-    else
-        echo rm failed!
-    fi
 }
 
 
