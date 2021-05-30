@@ -1,15 +1,15 @@
-# kvm-manage
+# zzxia-kvm-manage
 
-## 介绍
+## 1 介绍
 批量克隆、修改、删除KVM虚拟机。适合小企业使用。
 
-### 功能：
+### 1.1 功能：
 1. 克隆虚拟机：通过编辑list.csv文件定义虚拟机信息，然后运行vm-clone.sh，选择克隆模板，然后按照list.csv清单克隆出想要的虚拟机
 1. 修改虚拟机信息：【主机名、IP、IP子网掩码、网关、域名、DNS】，一般主要配合vm-clone.sh使用，也可以单独使用
 1. 批量删除虚拟机指定虚拟机
 1. 通过清单选择要删除的虚拟机
 
-### 喜欢她，就满足她：
+### 1.2 喜欢她，就满足她：
 1. 【Star】她，让她看到你是爱她的；
 3. 【Issue】她，告诉她有哪些小脾气，她会改的，手动小绵羊；
 2. 【Fork】她，为她增加新功能，修Bug，让她更加卡哇伊；
@@ -17,17 +17,17 @@
 <img src="https://img-blog.csdnimg.cn/20210429155627295.jpg?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3poZl9zeQ==,size_16,color_FFFFFF,t_70#pic_center" alt="打赏" style="zoom:50%;" />
 
 
-## 软件架构
+## 2 软件架构
 Linux shell
 
-## 安装教程
+## 3 安装教程
 克隆到KVM服务器上即可
 
-## 使用说明
+## 4 使用说明
 请使用-h|--help参数运行sh脚本即可看到使用帮助
 除了kvm，你还需要安装guestfs，在centos7上运行`yum install -y  libguestfs-tools`
 
-### list.csv
+### 4.1 list.csv
 根据需要定制虚拟机信息，以逗号分隔，用#注释掉不需要的行
 ```csv
 $ cat list.csv 
@@ -43,7 +43,7 @@ v-192-168-11-194-etcd,2,4,br1,192.168.11.194,24,192.168.11.1,zjlh.lan,192.168.11
 #v-192-168-11-196-etcd,2,4,br1,192.168.11.196,24,192.168.11.1,zjlh.lan,192.168.11.3 192.168.11.4
 v-192-168-11-197-repo,2,4,br1,192.168.11.197,24,192.168.11.1,zjlh.lan,192.168.11.3 192.168.11.4
 ```
-### 克隆
+### 4.2 克隆
 
 **克隆前的建议：**
 - 建议先制作好一个较为完美的模板虚拟机，然后在克隆时选择使用他
@@ -75,7 +75,7 @@ $ ./vm-clone.sh --help
         #
         ./vm-clone.sh  -f vm.list
 ```
-### 修改vm信息
+### 4.3 修改vm信息
 ```bash
 $ ./vm-img-modify.sh 
 
@@ -98,7 +98,7 @@ $ ./vm-img-modify.sh
         ./vm-img-modify.sh  v-192-168-1-3-nexxxx  192.168.1.3  24  192.168.11.1  zjlh.lan  192.168.11.3  192.168.11.4
         ./vm-img-modify.sh  v-192-168-1-3-nexxxx  192.168.1.3  24  192.168.11.1
 ```
-### 删除虚拟机
+### 4.4 删除虚拟机
 ```bash
 $ ./vm-rm.sh 
 
@@ -121,12 +121,12 @@ $ ./vm-rm.sh
         ./vm-rm.sh  虚拟机1
         ./vm-rm.sh  虚拟机1  虚拟机2
 ```
-### 从列表中选择要删除的虚拟机
+### 4.5 从列表中选择要删除的虚拟机
 ```bash
 $ ./vm-rm-list.sh
 ```
 
-## 参与贡献
+## 5 参与贡献
 
 1.  Fork 本仓库
 2.  新建 Feat_xxx 分支
