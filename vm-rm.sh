@@ -13,7 +13,7 @@ cd ${SH_PATH}
 
 # 引入env
 . ${SH_PATH}/kvm.env
-#QUIET_DELETE_IMG='yes'
+#QUIET=
 
 
 F_HELP()
@@ -23,7 +23,7 @@ F_HELP()
     注意：本脚本在centos 7上测试通过
     用法：
         $0  [-h|--help]
-        $0  [{VM_NAME1}]  {VM_NAME2} ... {VM_NAMEn}
+        $0  <-q|--quiet>  [{VM_NAME1}]  {VM_NAME2} ... {VM_NAMEn}
     参数说明：
         \$0   : 代表脚本本身
         []   : 代表是必选项
@@ -33,53 +33,58 @@ F_HELP()
         %    : 代表通配符，非精确值，可以被包含
         #
         -h|--help      此帮助
+        -q|--quiet     静默方式
     示例:
         #
         $0  虚拟机1
         $0  虚拟机1  虚拟机2
+        # 静默
+        $0  -q  虚拟机1  虚拟机2
     "
 }
 
 
 
+# 用法：RM_VM  虚拟机名
 RM_VM ()
 {
+    F_VM_NAME=$1
     echo "------------------------------"
-    echo "删除虚拟机：$VM_NAME ......"
+    echo "删除虚拟机：$F_VM_NAME ......"
 
     # vm ? exist
-    virsh list --all | grep -q "${VM_NAME}"
+    virsh list --all | grep -q "${F_VM_NAME}"
     ERR1=$?
     if [ $ERR1 != 0 ]; then
-        echo "${VM_NAME} NOT exist !"
+        echo "${F_VM_NAME} NOT exist !"
         return 2
     fi
 
     # vm name ? match
-    VM_SEARCH=$(virsh list --all | grep "${VM_NAME}" | awk '{print $2}')
-    if [ "${VM_NAME}" != "${VM_SEARCH}" ]; then
-        echo "${VM_NAME} : vmname NOT match !"
+    VM_SEARCH=$(virsh list --all | grep "${F_VM_NAME}" | awk '{print $2}')
+    if [ "${F_VM_NAME}" != "${VM_SEARCH}" ]; then
+        echo "${F_VM_NAME} : vmname NOT match !"
         return 3
     fi
 
     # force shutdown
     ## ?running
-    virsh list | grep "${VM_NAME}"
+    virsh list | grep "${F_VM_NAME}"
     RUNNING=$?
     if [ $RUNNING = 0 ]; then
-        virsh destroy "${VM_NAME}"
+        virsh destroy "${F_VM_NAME}"
     fi
 
     # rm img
-    N=$( virsh  dumpxml  --domain "${VM_NAME}"  | grep  "<disk type='file' device='disk'>" | wc -l )
+    N=$( virsh  dumpxml  --domain "${F_VM_NAME}"  | grep  "<disk type='file' device='disk'>" | wc -l )
     for ((i=1;i<=N;i++));
     do
-        IMG_FILE=$( virsh  dumpxml  --domain "${VM_NAME}"  | grep -A2  "<disk type='file' device='disk'>" | sed -n '3p' | awk -F "'" '{print $2}' )
+        IMG_FILE=$( virsh  dumpxml  --domain "${F_VM_NAME}"  | grep -A2  "<disk type='file' device='disk'>" | sed -n '3p' | awk -F "'" '{print $2}' )
         #
-        if [ "${QUIET_DELETE_IMG}" = "yes"  -a  -n "${IMG_FILE}" ]; then
+        if [ "${QUIET}" = "yes"  -a  -n "${IMG_FILE}" ]; then
             rm  -f "${IMG_FILE}"
             echo 'OK，已删除'
-        elif [ "${QUIET_DELETE_IMG}" != "yes"  -a  -n "${IMG_FILE}" ]; then
+        elif [ "${QUIET}" != "yes"  -a  -n "${IMG_FILE}" ]; then
             read -t 30 -p "重要提示：需要删除虚拟机镜像文件【${IMG_FILE}】，默认[no]，(yes|no)：" AK
             if [ "x${AK}" = 'xyes' ]; then
                 rm  -f "${IMG_FILE}"
@@ -91,22 +96,45 @@ RM_VM ()
     done
 
     # undefine VM ,this will delete xml
-    virsh undefine "${VM_NAME}"
+    virsh undefine "${F_VM_NAME}"
 }
 
 
-
-#
-case "$1" in
-    -h|--help)
-        F_HELP
-        exit
-        ;;
-esac
-#
-if [ $# -eq 0 ]; then
+# 参数检查
+TEMP=`getopt -o hq  -l help,quiet -- "$@"`
+if [ $? != 0 ]; then
+    echo "参数不合法，退出"
     F_HELP
     exit 1
+fi
+#
+eval set -- "${TEMP}"
+
+
+while true
+do
+    case "$1" in
+        -h|--help)
+            F_HELP
+            exit
+            ;;
+        -q|--quiet)
+            QUIET='yes'
+            shift
+            ;;
+        --)
+            shift
+            break
+            ;;
+    esac
+done
+
+
+
+#
+if [ $# -eq 0 ]; then
+    echo -e "\n峰哥说：请提供需要删除的虚拟机\n"
+    exit 2
 fi
 
 #
@@ -114,7 +142,7 @@ ARG_NUM=$#
 for ((i=1;i<=ARG_NUM;i++))
 do
     VM_NAME=$1
-    RM_VM
+    RM_VM  ${VM_NAME}
     echo '------------------------------'
     shift
 done
