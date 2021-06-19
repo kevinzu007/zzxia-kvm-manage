@@ -31,8 +31,8 @@ F_HELP()
     注意：本脚本在centos 7上测试通过
     用法：
         $0  [-h|--help]
-        $0  <-f|--file>  < -q|--quiet  [-t|--template {虚拟机模板}] >
-        $0  <-f|--file>  <-t|--template {虚拟机模板}>
+        $0  <-f|--file {清单文件}>  < -q|--quiet  [-t|--template {虚拟机模板}] >
+        $0  <-f|--file {清单文件}>  <-t|--template {虚拟机模板}>
     参数说明：
         \$0   : 代表脚本本身
         []   : 代表是必选项
@@ -42,7 +42,7 @@ F_HELP()
         %    : 代表通配符，非精确值，可以被包含
         #
         -h|--help      此帮助
-        -f|--file      虚拟机清单文件
+        -f|--file      虚拟机清单文件，默认为【./list.csv】
             文件格式如下（字段之间用【,】分隔）：
             #VM_NAME,CPU(个),MEM(GB),NET名, IP1,IP_MASK1,GATEWAY1 ,DOMAIN,DNS1 DNS2
             v-192-168-1-2-nextcloud,2,4,br1, 192.168.1.2,24,192.168.11.1, zjlh.lan,192.168.11.3 192.168.11.4
@@ -52,11 +52,15 @@ F_HELP()
     示例:
         #
         $0  -h
-        $0  -f vm.list
-        $0  -f vm.list  -q  -t v-centos-1
-        $0              -q  -t v-centos-1
-        $0                  -t v-centos-1
-        $0  -f vm.list      -t v-centos-1
+        # 一般
+        $0                       #--- 默认虚拟机清单文件【./list.csv】，非静默方式，手动选择模板
+        $0  -t v-centos-1        #--- 默认虚拟机清单文件【./list.csv】，非静默方式，基于模板【v-centos-1】创建
+        # 指定vm清单文件
+        $0  -f vm.list                      #--- 使用虚拟机清单文件【vm.list】，非静默方式，手动选择模
+        $0  -f vm.list  -t v-centos-1       #--- 使用虚拟机清单文件【vm.list】，非静默方式，基于模板【v-centos-1】创建
+        # 静默方式
+        $0  -q  -t v-centos-1               #--- 默认虚拟机清单文件【./list.csv】，静默方式，基于模板【v-centos-1】创建
+        $0  -q  -t v-centos-1  -f vm.list   #--- 使用虚拟机清单文件【vm.list】，静默方式，基于模板【v-centos-1】创建
     "
 }
 
@@ -109,40 +113,44 @@ if [ ! -f "${VM_LIST}" ] ; then
     exit 2
 fi
 
-
 #
 VM_LIST_TMP="${VM_LIST}.tmp"
 sed  -e '/^#/d' -e '/^$/d' -e '/^[ ]*$/d' ${VM_LIST} >${VM_LIST_TMP}
-#
+
+
+# 模板
 VM_LIST_ONLINE="/tmp/${SH_NAME}-vm.list.online"
 virsh list --all > ${VM_LIST_ONLINE}
 sed -i '1,2d;s/[ ]*//;/^$/d'  ${VM_LIST_ONLINE}
 #
-if [ "${QUIET}" = "no" ]; then
-    echo  "虚拟机模板："
-    echo "---------------------------------------------"
-    awk '{printf "%c : %-40s %s %s\n", NR+96, $2,$3,$4}' ${VM_LIST_ONLINE}
-    echo "---------------------------------------------"
-    echo "请选择你想使用的模版，如果模版机在“running”状态，可能会clone失败！"
-    read -p "请输入："  ANSWER
-
-    # 获取选择的项并回显
-    VM_TEMPLATE=$(awk '{printf "%c:%s\n", NR+96, $2}' ${VM_LIST_ONLINE} | awk -F ":"  "/^${ANSWER}/{print \$2}")
-    echo "OK！"
-    echo "你选择的是：${VM_TEMPLATE}"
-    read -p "按任意键继续......"
-else
-    #
-    if [ -z "${VM_TEMPLATE}" ]; then
-        echo -e "\n峰哥说：在静默方式下必须提供参数【-t|--template】！\n"
-        exit 2
-    fi
-    #
+if [ -n "${VM_TEMPLATE}" ]; then
     if [ `grep  -q  "${VM_TEMPLATE}"  ${VM_LIST_ONLINE}; echo $?` -ne 0 ]; then
         echo -e "\n峰哥说：模板【${VM_TEMPLATE}】不存在，请检查！\n"
         exit 1
     fi
+else
+    if [ "${QUIET}" = "no" ]; then
+        echo  "虚拟机模板："
+        echo "---------------------------------------------"
+        awk '{printf "%c : %-40s %s %s\n", NR+96, $2,$3,$4}' ${VM_LIST_ONLINE}
+        echo "---------------------------------------------"
+        echo "请选择你想使用的模版，如果模版机在“running”状态，可能会clone失败！"
+        read -p "请输入："  ANSWER
+
+        # 获取选择的项并回显
+        VM_TEMPLATE=$(awk '{printf "%c:%s\n", NR+96, $2}' ${VM_LIST_ONLINE} | awk -F ":"  "/^${ANSWER}/{print \$2}")
+        echo "OK！"
+        echo "你选择的是：${VM_TEMPLATE}"
+        read -p "按任意键继续......"
+    else
+        #
+        if [ -z "${VM_TEMPLATE}" ]; then
+            echo -e "\n峰哥说：在静默方式下必须提供参数【-t|--template】！\n"
+            exit 2
+        fi
+    fi
 fi
+
 
 
 echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
@@ -209,12 +217,7 @@ echo  "OK！"
 
 
 
-#
-if [ ! -x ./vm-img-modify.sh ] ; then
-    echo "找不到文件：./vm-img-modify.sh，请检查文件是否存在，是否与" $0 "的路径相同"
-    exit 5
-fi
-#
+# 修改vm image
 echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 if [ "${QUIET}" = 'no' ]; then
@@ -242,7 +245,7 @@ case "${ANSWER}" in
             VM_DNS=`echo ${VM_DNS}`
             VM_DNS1=`echo ${VM_DNS} | cut -d " " -f 1`
             VM_DNS2=`echo ${VM_DNS} | cut -d " " -f 2`
-            ./vm-img-modify.sh  "${VM_NAME}"  "${VM_IP}"  "${VM_IP_MASK}"  "${VM_GATEWAY}"  "${VM_DOMAIN}"  "${VM_DNS1}"  "${VM_DNS2}"
+            ./vm-img-modify.sh  --quiet  "${VM_NAME}"  "${VM_IP}"  "${VM_IP_MASK}"  "${VM_GATEWAY}"  "${VM_DOMAIN}"  "${VM_DNS1}"  "${VM_DNS2}"
         done<${VM_LIST_TMP}
         ;;
     *)

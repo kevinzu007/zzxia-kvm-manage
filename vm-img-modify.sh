@@ -13,12 +13,9 @@ cd ${SH_PATH}
 
 # 引入env
 . ${SH_PATH}/kvm.env
-#MODEL_VM_LV='/dev/mapper/cl-root'
-
-
-
-# 网卡
-MODEL_VM_NET_1_FILE='/etc/sysconfig/network-scripts/ifcfg-eth0'   #--- centos 7
+#QUIET=
+#MODEL_VM_LV=
+#MODEL_VM_NET_1_FILE=
 
 
 
@@ -26,10 +23,11 @@ F_HELP()
 {
     echo "
     用途：KVM虚拟机信息修改（主机名、IP、IP子网掩码、网关、域名、DNS）
+    依赖：
     注意：本脚本在centos 7上测试通过
     用法：
         $0  [-h|--help]
-        $0  [{VM_NAME}  {NEW_IP}  {NEW_IP_MASK}  {NEW_GATEWAY}]  {NEW_DOMAIN}  <{NEW_DNS1}>  <{NEW_DNS2}>
+        $0  <-q|--quiet>  [ {VM_NAME}  {NEW_IP}  {NEW_IP_MASK}  {NEW_GATEWAY} ]  <{NEW_DOMAIN}>  <{NEW_DNS1}>  <{NEW_DNS2}>
     参数说明：
         \$0   : 代表脚本本身
         []   : 代表是必选项
@@ -39,12 +37,46 @@ F_HELP()
         %    : 代表通配符，非精确值，可以被包含
         #
         -h|--help      此帮助
+        -q|--quiet     静默方式
     示例:
         #
+        $0  -h        #--- 帮助
+        # 一般
         $0  v-192-168-1-3-nexxxx  192.168.1.3  24  192.168.11.1  zjlh.lan  192.168.11.3  192.168.11.4
         $0  v-192-168-1-3-nexxxx  192.168.1.3  24  192.168.11.1
+        # 静默方式
+        $0  -q  v-192-168-1-3-nexxxx  192.168.1.3  24  192.168.11.1  zjlh.lan  192.168.11.3  192.168.11.4
     "
 }
+
+
+
+TEMP=`getopt -o hq  -l help,quiet -- "$@"`
+if [ $? != 0 ]; then
+    echo "参数不合法！【请查看帮助：\$0 --help】"
+    exit 1
+fi
+#
+eval set -- "${TEMP}"
+
+
+while true
+do
+    case $1 in
+        -h|--help)
+            F_HELP
+            exit
+            ;;
+        -q|--quiet)
+            QUIET='yes'
+            shift
+            ;;
+        --)
+            shift
+            break
+            ;;
+    esac
+done
 
 
 
@@ -73,7 +105,6 @@ fi
 
 
 
-
 echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 echo "------------------------------------------------"
 echo "待修改虚拟机名称：${VM_NAME}"
@@ -86,14 +117,13 @@ echo "挂载的逻辑卷：${MODEL_VM_LV}"
 echo "挂载路径：${MOUNT_PATH}"
 echo "------------------------------------------------"
 
-#---如果不是在vm-clone.sh中调用运行，则添加确认环节
-ps -ef | grep -v 'grep' | grep vm-clone.sh > /dev/null 2>&1
-if [ $? -ne 0 ] ; then
+#
+if [ "${QUIET}" = 'no' ] ; then
     echo "以上信息正确吗？"
     echo "如果正确，请输入：'"y"'"
     read -p "请输入："  ANSWER
     if [ ${ANSWER}x != "y"x ] ; then
-        echo "请重新设置参数"
+        echo "OK，请重新设置参数"
         exit 1
     fi
 fi
@@ -103,7 +133,7 @@ fi
 which guestmount >/dev/null 2>&1
 GUESTFS_ERR=$?
 if [ ${GUESTFS_ERR} -ne 0 ]; then
-    echo "请先安装guestfs，即将退出！"
+    echo -e "\n峰哥说：请先安装guestfs，已退出！\n"
     exit 1
 else
     #IMG_PATH='/var/lib/libvirt/images'
@@ -124,6 +154,7 @@ cat /dev/null  > "${MOUNT_PATH}/etc/machine-id"
 rm -f  ${MOUNT_PATH}/etc/ssh/ssh_host_*
 # 关闭IPv6
 sed -i  's/IPV6INIT=.*/IPV6INIT="no"/'  "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}"
+
 # NET
 sed -i  '/^UUID.*/s/^/#/'  "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}"
 grep -q 'IPADDR='  "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
@@ -135,16 +166,25 @@ grep -q '^PREFIX=' "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
 grep -q 'GATEWAY=' "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
     && sed -i  "s/GATEWAY=.*/GATEWAY=${NEW_GATEWAY}/"  "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
     || echo "GATEWAY=${NEW_GATEWAY}" >> "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}"
-grep -q 'DOMAIN=' "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
-    && sed -i  "s/DOMAIN=.*/DOMAIN=${NEW_DOMAIN}/"  "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
-    || echo "DOMAIN=${NEW_DOMAIN}" >> "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}"
-grep -q '^DNS1=' "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
-    && sed -i  "s/^DNS1=.*/DNS1=${NEW_DNS1}/"  "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
-    || echo "DNS1=${NEW_DNS1}" >> "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}"
-grep -q '^DNS2=' "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
-    && sed -i  "s/^DNS2=.*/DNS2=${NEW_DNS2}/"  "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
-    || echo "DNS2=${NEW_DNS2}" >> "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}"
-
+## 可选
+# 域名
+if [ -n "${NEW_DOMAIN}" ]; then
+    grep -q 'DOMAIN=' "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
+        && sed -i  "s/DOMAIN=.*/DOMAIN=${NEW_DOMAIN}/"  "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
+        || echo "DOMAIN=${NEW_DOMAIN}" >> "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}"
+fi
+# DNS1
+if [ -n "${NEW_DNS1}" ]; then
+    grep -q '^DNS1=' "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
+        && sed -i  "s/^DNS1=.*/DNS1=${NEW_DNS1}/"  "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
+        || echo "DNS1=${NEW_DNS1}" >> "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}"
+fi
+# DNS2
+if [ -n "${NEW_DNS2}" ]; then
+    grep -q '^DNS2=' "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
+        && sed -i  "s/^DNS2=.*/DNS2=${NEW_DNS2}/"  "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
+        || echo "DNS2=${NEW_DNS2}" >> "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}"
+fi
 
 SED_ERR=$?
 echo "sed错误代码 : ${SED_ERR}"
@@ -154,7 +194,6 @@ else
     echo "修改失败，请检查！"
 fi
 echo "------------------------------------------------"
-
 
 #---取消挂载
 guestunmount ${MOUNT_PATH}
