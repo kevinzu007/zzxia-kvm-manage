@@ -53,10 +53,13 @@ v-192-168-11-197-repo,2,4,br1,192.168.11.197,24,192.168.11.1,zjlh.lan,192.168.11
 $ ./vm-clone.sh --help
 
     用途：KVM上虚拟机克隆，并修改相关信息（主机名、IP、IP子网掩码、网关、域名、DNS）
-    注意：本脚本在centos 7上测试通过，需要vm-img-modify.sh配合
+    依赖：
+        ./vm-img-modify.sh
+    注意：本脚本在centos 7上测试通过
     用法：
         ./vm-clone.sh  [-h|--help]
-        ./vm-clone.sh  [-f|--file]
+        ./vm-clone.sh  <-f|--file {清单文件}>  < -q|--quiet  [-t|--template {虚拟机模板}] >
+        ./vm-clone.sh  <-f|--file {清单文件}>  <-t|--template {虚拟机模板}>
     参数说明：
         $0   : 代表脚本本身
         []   : 代表是必选项
@@ -66,24 +69,36 @@ $ ./vm-clone.sh --help
         %    : 代表通配符，非精确值，可以被包含
         #
         -h|--help      此帮助
-        -f|--file      虚拟机清单文件
+        -f|--file      虚拟机清单文件，默认为【./list.csv】
             文件格式如下（字段之间用【,】分隔）：
             #VM_NAME,CPU(个),MEM(GB),NET名, IP1,IP_MASK1,GATEWAY1 ,DOMAIN,DNS1 DNS2
             v-192-168-1-2-nextcloud,2,4,br1, 192.168.1.2,24,192.168.11.1, zjlh.lan,192.168.11.3 192.168.11.4
             v-192-168-1-3-nexxxx,2,4,br1, 192.168.1.3,24,192.168.11.1, zjlh.lan,192.168.11.3
+        -q|--quiet     静默方式
+        -t|--templat   指定虚拟机模板
     示例:
         #
-        ./vm-clone.sh  -f vm.list
+        ./vm-clone.sh  -h
+        # 一般
+        ./vm-clone.sh                       #--- 默认虚拟机清单文件【./list.csv】，非静默方式，手动选择模板
+        ./vm-clone.sh  -t v-centos-1        #--- 默认虚拟机清单文件【./list.csv】，非静默方式，基于模板【v-centos-1】创建
+        # 指定vm清单文件
+        ./vm-clone.sh  -f vm.list                      #--- 使用虚拟机清单文件【vm.list】，非静默方式，手动选择模
+        ./vm-clone.sh  -f vm.list  -t v-centos-1       #--- 使用虚拟机清单文件【vm.list】，非静默方式，基于模板【v-centos-1】创建
+        # 静默方式
+        ./vm-clone.sh  -q  -t v-centos-1               #--- 默认虚拟机清单文件【./list.csv】，静默方式，基于模板【v-centos-1】创建
+        ./vm-clone.sh  -q  -t v-centos-1  -f vm.list   #--- 使用虚拟机清单文件【vm.list】，静默方式，基于模板【v-centos-1】创建
 ```
 ### 4.3 修改vm信息
 ```bash
 $ ./vm-img-modify.sh 
 
-    用途：KVM虚拟机信息修改（主机名、IP、IP子网掩码、网关、域名、DNS）
+    用途：修改KVM虚拟机主机名及网卡信息（主机名、IP、IP子网掩码、网关、域名、DNS）
+    依赖：
     注意：本脚本在centos 7上测试通过
     用法：
         ./vm-img-modify.sh  [-h|--help]
-        ./vm-img-modify.sh  [{VM_NAME}  {NEW_IP}  {NEW_IP_MASK}  {NEW_GATEWAY}]  {NEW_DOMAIN}  <{NEW_DNS1}>  <{NEW_DNS2}>
+        ./vm-img-modify.sh  <-q|--quiet>  [ {VM_NAME}  {NEW_IP}  {NEW_IP_MASK}  {NEW_GATEWAY} ]  <{NEW_DOMAIN}>  <{NEW_DNS1}>  <{NEW_DNS2}>
     参数说明：
         $0   : 代表脚本本身
         []   : 代表是必选项
@@ -93,11 +108,17 @@ $ ./vm-img-modify.sh
         %    : 代表通配符，非精确值，可以被包含
         #
         -h|--help      此帮助
+        -q|--quiet     静默方式
     示例:
         #
+        ./vm-img-modify.sh  -h        #--- 帮助
+        # 一般
         ./vm-img-modify.sh  v-192-168-1-3-nexxxx  192.168.1.3  24  192.168.11.1  zjlh.lan  192.168.11.3  192.168.11.4
         ./vm-img-modify.sh  v-192-168-1-3-nexxxx  192.168.1.3  24  192.168.11.1
+        # 静默方式
+        ./vm-img-modify.sh  -q  v-192-168-1-3-nexxxx  192.168.1.3  24  192.168.11.1  zjlh.lan  192.168.11.3  192.168.11.4
 ```
+
 ### 4.4 删除虚拟机
 ```bash
 $ ./vm-rm.sh 
@@ -106,7 +127,7 @@ $ ./vm-rm.sh
     注意：本脚本在centos 7上测试通过
     用法：
         ./vm-rm.sh  [-h|--help]
-        ./vm-rm.sh  [{VM_NAME1}]  {VM_NAME2} ... {VM_NAMEn}
+        ./vm-rm.sh  <-q|--quiet>  [{VM_NAME1}]  {VM_NAME2} ... {VM_NAMEn}
     参数说明：
         $0   : 代表脚本本身
         []   : 代表是必选项
@@ -116,11 +137,15 @@ $ ./vm-rm.sh
         %    : 代表通配符，非精确值，可以被包含
         #
         -h|--help      此帮助
+        -q|--quiet     静默方式
     示例:
         #
         ./vm-rm.sh  虚拟机1
         ./vm-rm.sh  虚拟机1  虚拟机2
+        # 静默
+        ./vm-rm.sh  -q  虚拟机1  虚拟机2
 ```
+
 ### 4.5 从列表中选择要删除的虚拟机
 ```bash
 $ ./vm-rm-list.sh
