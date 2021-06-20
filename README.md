@@ -151,6 +151,48 @@ $ ./vm-rm.sh
 $ ./vm-rm-list.sh
 ```
 
+### 4.6 启动（或自动启动）虚拟机
+```bash
+$ ./vm-start.sh -h
+
+    用途：
+    依赖：
+    注意：本脚本在centos 7上测试通过
+    用法：
+        ./vm-start.sh  [-h|--help]
+        ./vm-start.sh  [ <-s|--start>  <-a|--autostart> ]  [ [-f|--file <{清单文件}>] | [-S|--select] | [{虚拟机1} {虚拟机2} ... {虚拟机n}] ]
+    参数说明：
+        $0   : 代表脚本本身
+        []   : 代表是必选项
+        <>   : 代表是可选项
+        |    : 代表左右选其一
+        {}   : 代表参数值，请替换为具体参数值
+        %    : 代表通配符，非精确值，可以被包含
+        #
+        -h|--help      此帮助
+        -s|--start     启动虚拟机
+        -a|--autostart 开启自动启动虚拟机
+        -f|--file      从文件选择虚拟机，默认为【./list.csv】
+        -S|--select    从KVM中选择虚拟机
+    示例:
+        #
+        ./vm-start.sh  -h
+        # 一般（从文件）
+        ./vm-start.sh  -s                   #--- 启动默认虚拟机清单文件【./list.csv】中的虚拟机
+        ./vm-start.sh  -s  -a               #--- 启动默认虚拟机清单文件【./list.csv】中的虚拟机，并设置为自动启动
+        ./vm-start.sh  -a                   #--- 自动启动默认虚拟机清单文件【./list.csv】中的虚拟机
+        # 从指定文件
+        ./vm-start.sh  -s  -f my_vm.list    #--- 启动虚拟机清单文件【my_vm.list】中的虚拟机
+        ./vm-start.sh  -a  -f my_vm.list    #--- 自动启动虚拟机清单文件【my_vm.list】中的虚拟机
+        ./vm-start.sh  -s  -f               #--- 启动默认虚拟机清单文件【./list.csv】中的虚拟机
+        # 我选择
+        ./vm-start.sh  -s  -S               #--- 启动我选择的虚拟机
+        ./vm-start.sh  -a  -S               #--- 自动启动我选择的虚拟机
+        # 指定虚拟机
+        ./vm-start.sh  -s  vm1 vm2          #--- 启动虚拟机【vm1、vm2】
+        ./vm-start.sh  -a  vm1 vm2          #--- 自动启动虚拟机【vm1、vm2】
+```
+
 ## 5 参与贡献
 
 1.  Fork 本仓库
