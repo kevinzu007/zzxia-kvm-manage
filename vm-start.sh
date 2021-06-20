@@ -123,10 +123,15 @@ done
 case "${VM_LIST_FROM}" in
     arg)
         ARG_NUM=$#
+        if [ ${ARG_NUM} -eq 0 ]; then
+            echo -e "\n峰哥说：缺少参数，请查看帮助！\n"
+            exit 2
+        fi
         for ((i=1;i<=ARG_NUM;i++))
         do
             VM_NAME=$1
             shift
+            # 匹配？
             #
             if [ "${VM_START}" = 'yes' ]; then
                 virsh start  ${VM_NAME}
@@ -144,6 +149,7 @@ case "${VM_LIST_FROM}" in
         do
             VM_NAME=`echo $LINE | cut -f 1 -d ,`
             VM_NAME=`echo $VM_NAME`
+            # 匹配？
             #
             if [ "${VM_START}" = 'yes' ]; then
                 virsh start  ${VM_NAME}
@@ -183,7 +189,7 @@ case "${VM_LIST_FROM}" in
         done
         ;;
     *)
-        echo -e "\n参数错误，你私自修改脚本了\n"
+        echo  "参数错误，你私自修改脚本了"
         exit 1
         ;;
 esac

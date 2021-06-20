@@ -15,6 +15,7 @@ cd ${SH_PATH}
 . ${SH_PATH}/kvm.env
 #VM_IMG_PATH=
 #VM_XML_PATH=
+#TEMPLATE_VM_NET_ON_KVM=
 #QUIET=
 
 # 本地env
@@ -189,8 +190,10 @@ y)
         echo "新虚拟机IMG： ${VM_IMG_PATH}/${VM_IMG}"
         echo "新虚拟机XML： ${VM_XML_PATH}/${VM_XML}"
         echo "---------------------------------------------"
-        echo "OK！"
+        # 是否已存在？
+        #
         virt-clone -o ${VM_TEMPLATE}  -n ${VM_NAME}  -f ${VM_IMG_PATH}/${VM_IMG}
+        echo "OK！"
         CLONE_ERR=$?
         if [ ${CLONE_ERR} != 0 ]; then
             echo "【${VM_NAME}】clone error, 请检查!"
@@ -199,7 +202,7 @@ y)
         sed -i  s/"<vcpu.*vcpu>"/"<vcpu placement='static'>${VM_CPU}<\/vcpu>"/g  "${VM_XML_PATH}/${VM_XML}"
         sed -i  s/"<memory.*memory>"/"<memory unit='GiB'>${VM_MEM}<\/memory>"/g  "${VM_XML_PATH}/${VM_XML}"
         sed -i  s/"<currentMemory.*currentMemory>"/"<currentMemory unit='GiB'>${VM_MEM}<\/currentMemory>"/g  "${VM_XML_PATH}/${VM_XML}"
-        sed -i  s/"br1"/"${VM_NET}"/g  "${VM_XML_PATH}/${VM_XML}"
+        sed -i  s/"${TEMPLATE_VM_NET_ON_KVM}"/"${VM_NET}"/g  "${VM_XML_PATH}/${VM_XML}"
         # On CentOS7.1 BUG修复，参考：https://bugs.centos.org/view.php?id=10402
         #sed -i  s/'domain-m-centos-2c-4g'/"domain-${VM_NAME}"/  "${VM_XML_PATH}/${VM_XML}"
         sed -i  s/"domain-${VM_TEMPLATE}"/"domain-${VM_NAME}"/  "${VM_XML_PATH}/${VM_XML}"

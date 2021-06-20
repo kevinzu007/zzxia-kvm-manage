@@ -52,6 +52,7 @@ RM_VM ()
     echo "------------------------------"
     echo "删除虚拟机：$F_VM_NAME ......"
 
+    # 匹配？
     # vm ? exist
     virsh list --all | grep -q "${F_VM_NAME}"
     ERR1=$?
@@ -59,7 +60,6 @@ RM_VM ()
         echo "${F_VM_NAME} NOT exist !"
         return 2
     fi
-
     # vm name ? match
     VM_SEARCH=$(virsh list --all | grep "${F_VM_NAME}" | awk '{print $2}')
     if [ "${F_VM_NAME}" != "${VM_SEARCH}" ]; then

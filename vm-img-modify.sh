@@ -14,8 +14,8 @@ cd ${SH_PATH}
 # 引入env
 . ${SH_PATH}/kvm.env
 #QUIET=
-#MODEL_VM_LV=
-#MODEL_VM_NET_1_FILE=
+#TEMPLATE_VM_LV=
+#TEMPLATE_VM_NET_1_FILE=
 
 
 
@@ -113,7 +113,7 @@ echo "新IP：${NEW_IP}"
 echo "新IP掩码：${NEW_IP_MASK}"
 echo "新网关：${NEW_GATEWAY}"
 echo "新DNS：${NEW_DNS1} ${NEW_DNS2}"
-echo "挂载的逻辑卷：${MODEL_VM_LV}"
+echo "挂载的逻辑卷：${TEMPLATE_VM_LV}"
 echo "挂载路径：${MOUNT_PATH}"
 echo "------------------------------------------------"
 
@@ -129,6 +129,7 @@ if [ "${QUIET}" = 'no' ] ; then
 fi
 
 
+# 匹配？
 
 which guestmount >/dev/null 2>&1
 GUESTFS_ERR=$?
@@ -137,8 +138,8 @@ if [ ${GUESTFS_ERR} -ne 0 ]; then
     exit 1
 else
     #IMG_PATH='/var/lib/libvirt/images'
-    #guestmount -a "${IMG_PATH}/${VM_NAME}.img" -w -m ${MODEL_VM_LV} ${MOUNT_PATH}
-    guestmount -d ${VM_NAME} -w -m ${MODEL_VM_LV} ${MOUNT_PATH}
+    #guestmount -a "${IMG_PATH}/${VM_NAME}.img" -w -m ${TEMPLATE_VM_LV} ${MOUNT_PATH}
+    guestmount -d ${VM_NAME} -w -m ${TEMPLATE_VM_LV} ${MOUNT_PATH}
 fi
 
 
@@ -153,37 +154,37 @@ cat /dev/null  > "${MOUNT_PATH}/etc/machine-id"
 # ssh_host_key
 rm -f  ${MOUNT_PATH}/etc/ssh/ssh_host_*
 # 关闭IPv6
-sed -i  's/IPV6INIT=.*/IPV6INIT="no"/'  "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}"
+sed -i  's/IPV6INIT=.*/IPV6INIT="no"/'  "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}"
 
 # NET
-sed -i  '/^UUID.*/s/^/#/'  "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}"
-grep -q 'IPADDR='  "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
-    && sed -i  "s/IPADDR=.*/IPADDR=${NEW_IP}/"  "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
-    || echo "IPADDR=${NEW_IP}" >> "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}"
-grep -q '^PREFIX=' "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
-    && sed -i  "s/^PREFIX=.*/PREFIX=${NEW_IP_MASK}/"  "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
-    || echo "PREFIX=${NEW_IP_MASK}" >> "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}"
-grep -q 'GATEWAY=' "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
-    && sed -i  "s/GATEWAY=.*/GATEWAY=${NEW_GATEWAY}/"  "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
-    || echo "GATEWAY=${NEW_GATEWAY}" >> "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}"
+sed -i  '/^UUID.*/s/^/#/'  "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}"
+grep -q 'IPADDR='  "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}" \
+    && sed -i  "s/IPADDR=.*/IPADDR=${NEW_IP}/"  "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}" \
+    || echo "IPADDR=${NEW_IP}" >> "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}"
+grep -q '^PREFIX=' "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}" \
+    && sed -i  "s/^PREFIX=.*/PREFIX=${NEW_IP_MASK}/"  "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}" \
+    || echo "PREFIX=${NEW_IP_MASK}" >> "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}"
+grep -q 'GATEWAY=' "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}" \
+    && sed -i  "s/GATEWAY=.*/GATEWAY=${NEW_GATEWAY}/"  "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}" \
+    || echo "GATEWAY=${NEW_GATEWAY}" >> "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}"
 ## 可选
 # 域名
 if [ -n "${NEW_DOMAIN}" ]; then
-    grep -q 'DOMAIN=' "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
-        && sed -i  "s/DOMAIN=.*/DOMAIN=${NEW_DOMAIN}/"  "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
-        || echo "DOMAIN=${NEW_DOMAIN}" >> "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}"
+    grep -q 'DOMAIN=' "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}" \
+        && sed -i  "s/DOMAIN=.*/DOMAIN=${NEW_DOMAIN}/"  "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}" \
+        || echo "DOMAIN=${NEW_DOMAIN}" >> "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}"
 fi
 # DNS1
 if [ -n "${NEW_DNS1}" ]; then
-    grep -q '^DNS1=' "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
-        && sed -i  "s/^DNS1=.*/DNS1=${NEW_DNS1}/"  "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
-        || echo "DNS1=${NEW_DNS1}" >> "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}"
+    grep -q '^DNS1=' "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}" \
+        && sed -i  "s/^DNS1=.*/DNS1=${NEW_DNS1}/"  "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}" \
+        || echo "DNS1=${NEW_DNS1}" >> "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}"
 fi
 # DNS2
 if [ -n "${NEW_DNS2}" ]; then
-    grep -q '^DNS2=' "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
-        && sed -i  "s/^DNS2=.*/DNS2=${NEW_DNS2}/"  "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}" \
-        || echo "DNS2=${NEW_DNS2}" >> "${MOUNT_PATH}/${MODEL_VM_NET_1_FILE}"
+    grep -q '^DNS2=' "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}" \
+        && sed -i  "s/^DNS2=.*/DNS2=${NEW_DNS2}/"  "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}" \
+        || echo "DNS2=${NEW_DNS2}" >> "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}"
 fi
 
 SED_ERR=$?
