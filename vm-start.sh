@@ -22,7 +22,7 @@ VM_LIST="${SH_PATH}/list.csv"
 F_HELP()
 {
     echo "
-    用途：
+    用途：启动虚拟机；设置虚拟机自动启动
     依赖：
     注意：本脚本在centos 7上测试通过
     用法：
@@ -40,6 +40,10 @@ F_HELP()
         -s|--start     启动虚拟机
         -a|--autostart 开启自动启动虚拟机
         -f|--file      从文件选择虚拟机，默认为【./list.csv】
+            文件格式如下（字段之间用【,】分隔）：
+            #VM_NAME,CPU(个),MEM(GB),NET名, IP1,IP_MASK1,GATEWAY1 ,DOMAIN,DNS1 DNS2
+            v-192-168-1-2-nextcloud,2,4,br1, 192.168.1.2,24,192.168.11.1, zjlh.lan,192.168.11.3 192.168.11.4
+            v-192-168-1-3-nexxxx,2,4,br1, 192.168.1.3,24,192.168.11.1, zjlh.lan,192.168.11.3
         -S|--select    从KVM中选择虚拟机
     示例:
         #
