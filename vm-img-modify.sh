@@ -132,6 +132,17 @@ VM_LIST_ONLINE="/tmp/${SH_NAME}-vm.list.online"
 virsh list --all | sed  '1,2d;s/[ ]*//;/^$/d'  > ${VM_LIST_ONLINE}
 
 
+# 匹配？
+if [ `F_VM_SEARCH  "${VM_NAME}" > /dev/null; echo $?` -ne 0 ]; then
+    echo -e "\n峰哥说：虚拟机【${VM_NAME}】不存在，请检查\n"
+    exit 1
+fi
+
+if [ "`F_VM_SEARCH ${VM_NAME}`" = 'running' ]; then
+    echo -e "\n峰哥说：虚拟机【${VM_NAME}】已启动，请先shutdown\n"
+    exit 1
+fi
+
 
 echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 echo "------------------------------------------------"
@@ -154,13 +165,6 @@ if [ "${QUIET}" = 'no' ] ; then
         echo "OK，请重新设置参数"
         exit 1
     fi
-fi
-
-
-# 匹配？
-if [ `F_VM_SEARCH  "${VM_NAME}" > /dev/null; echo $?` -ne 0 ]; then
-    echo -e "\n峰哥说：虚拟机【${VM_NAME}】不存在，请检查\n"
-    exit 1
 fi
 
 

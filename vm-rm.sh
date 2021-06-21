@@ -84,7 +84,7 @@ RM_VM ()
 
     # rm img
     N=$( virsh  dumpxml  --domain "${F_VM_NAME}"  | grep  "<disk type='file' device='disk'>" | wc -l )
-    for ((i=1;i<=N;i++));
+    for ((j=1;j<=N;j++));
     do
         IMG_FILE=$( virsh  dumpxml  --domain "${F_VM_NAME}"  | grep -A2  "<disk type='file' device='disk'>" | sed -n '3p' | awk -F "'" '{print $2}' )
         #
@@ -101,7 +101,6 @@ RM_VM ()
             fi
         fi
     done
-
     # undefine VM ,this will delete xml
     virsh undefine "${F_VM_NAME}"
 }
@@ -153,13 +152,14 @@ ARG_NUM=$#
 for ((i=1;i<=ARG_NUM;i++))
 do
     VM_NAME=$1
+    shift
+    #
     if [ `F_VM_SEARCH "${VM_NAME}" > /dev/null; echo $?` -ne 0 ]; then
         echo -e "\n峰哥说：虚拟机【${VM_NAME}】没找到，跳过！\n"
     else
         RM_VM  ${VM_NAME}
         echo '------------------------------'
     fi
-    shift
 done
 
 

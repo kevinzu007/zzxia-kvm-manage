@@ -218,11 +218,13 @@ y)
         echo "新虚拟机XML： ${VM_XML_PATH}/${VM_XML}"
         echo "---------------------------------------------"
         # 是否已存在？
-        #
-        virt-clone -o ${VM_TEMPLATE}  -n ${VM_NAME}  -f ${VM_IMG_PATH}/${VM_IMG}
-        echo "OK！"
-        CLONE_ERR=$?
-        if [ ${CLONE_ERR} != 0 ]; then
+        if [ `F_VM_SEARCH  "${VM_NAME}" > /dev/null; echo $?` -eq 0 ]; then
+            echo -e "\n峰哥说：虚拟机【${VM_NAME}】已存在，跳过\n"
+            continue
+        fi
+        # clone
+        virt-clone -o ${VM_TEMPLATE}  -n ${VM_NAME}  -f ${VM_IMG_PATH}/${VM_IMG}  > /tmp/${SH_NAME}-clone-${VM_NAME}.log 2>&1
+        if [ `grep -q 'ERROR' /tmp/${SH_NAME}-clone-${VM_NAME}.log; echo $?` -eq 0 ]; then
             echo "【${VM_NAME}】clone error, 请检查!"
             exit 1
         fi
@@ -235,14 +237,13 @@ y)
         sed -i  s/"domain-${VM_TEMPLATE}"/"domain-${VM_NAME}"/  "${VM_XML_PATH}/${VM_XML}"
         #重新define虚拟机
         virsh define  "${VM_XML_PATH}/${VM_XML}"
-    done<${VM_LIST_TMP}
+    done < ${VM_LIST_TMP}
     ;;
 *)
     echo "小子，好好检查吧！"
     exit 4
 esac
 
-echo  "虚拟机创建完成，请检查输出是否有错误"
 echo  "OK！"
 
 

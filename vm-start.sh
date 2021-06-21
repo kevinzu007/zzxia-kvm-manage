@@ -27,7 +27,7 @@ F_HELP()
     注意：本脚本在centos 7上测试通过
     用法：
         $0  [-h|--help]
-        $0  [ <-s|--start>  <-a|--autostart> ]  [ [-f|--file <{清单文件}>] | [-S|--select] | [{虚拟机1} {虚拟机2} ... {虚拟机n}] ]
+        $0  [ <-s|--start>  <-a|--autostart> ]  [ [-f|--file {清单文件}] | [-S|--select] | [-A|--ARG {虚拟机1} {虚拟机2} ... {虚拟机n}] ]
     参数说明：
         \$0   : 代表脚本本身
         []   : 代表是必选项
@@ -39,29 +39,29 @@ F_HELP()
         -h|--help      此帮助
         -s|--start     启动虚拟机
         -a|--autostart 开启自动启动虚拟机
-        -f|--file      从文件选择虚拟机，默认为【./list.csv】
+        -f|--file      从文件选择虚拟机（默认），默认文件为【./list.csv】
             文件格式如下（字段之间用【,】分隔）：
             #VM_NAME,CPU(个),MEM(GB),NET名, IP1,IP_MASK1,GATEWAY1 ,DOMAIN,DNS1 DNS2
             v-192-168-1-2-nextcloud,2,4,br1, 192.168.1.2,24,192.168.11.1, zjlh.lan,192.168.11.3 192.168.11.4
             v-192-168-1-3-nexxxx,2,4,br1, 192.168.1.3,24,192.168.11.1, zjlh.lan,192.168.11.3
         -S|--select    从KVM中选择虚拟机
+        -A|--ARG       从参数获取虚拟机
     示例:
         #
         $0  -h
-        # 一般（从文件）
+        # 一般（默认从默认文件）
         $0  -s                   #--- 启动默认虚拟机清单文件【./list.csv】中的虚拟机
         $0  -s  -a               #--- 启动默认虚拟机清单文件【./list.csv】中的虚拟机，并设置为自动启动
         $0  -a                   #--- 自动启动默认虚拟机清单文件【./list.csv】中的虚拟机
         # 从指定文件
         $0  -s  -f my_vm.list    #--- 启动虚拟机清单文件【my_vm.list】中的虚拟机
         $0  -a  -f my_vm.list    #--- 自动启动虚拟机清单文件【my_vm.list】中的虚拟机
-        $0  -s  -f               #--- 启动默认虚拟机清单文件【./list.csv】中的虚拟机
         # 我选择
         $0  -s  -S               #--- 启动我选择的虚拟机
         $0  -a  -S               #--- 自动启动我选择的虚拟机
         # 指定虚拟机
-        $0  -s  vm1 vm2          #--- 启动虚拟机【vm1、vm2】
-        $0  -a  vm1 vm2          #--- 自动启动虚拟机【vm1、vm2】
+        $0  -s  -A  vm1 vm2      #--- 启动虚拟机【vm1、vm2】
+        $0  -a  -A  vm1 vm2      #--- 自动启动虚拟机【vm1、vm2】
     "
 }
 
@@ -92,7 +92,7 @@ F_VM_SEARCH ()
 
 
 # 参数检查
-TEMP=`getopt -o hsaf::S  -l help,start,autostart,file::select -- "$@"`
+TEMP=`getopt -o hsaf:SA  -l help,start,autostart,file:,select,ARG -- "$@"`
 if [ $? != 0 ]; then
     echo "参数不合法，退出"
     F_HELP
@@ -104,7 +104,7 @@ eval set -- "${TEMP}"
 
 VM_START='no'
 VM_AUTOSTART='no'
-VM_LIST_FROM='arg'
+VM_LIST_FROM='file'
 while true
 do
     case "$1" in
@@ -131,6 +131,10 @@ do
             ;;
         -S|--select)
             VM_LIST_FROM='select'
+            shift
+            ;;
+        -A|--ARG)
+            VM_LIST_FROM='arg'
             shift
             ;;
         --)
@@ -162,15 +166,15 @@ case "${VM_LIST_FROM}" in
             VM_NAME=$1
             shift
             # 匹配？
-            if [ `F_VM_SEARCH "${VM_START}" > /dev/null; echo $?` ]; then
-                echo -e "\n峰哥说：虚拟机【${VM_START}】没找到，跳过！\n"
+            if [ `F_VM_SEARCH "${VM_NAME}" > /dev/null; echo $?` -ne 0 ]; then
+                echo -e "\n峰哥说：虚拟机【${VM_NAME}】没找到，跳过！\n"
                 continue
             fi
             #
             if [ "${VM_START}" = 'yes' ]; then
                 virsh start  ${VM_NAME}
             fi
-            if [ "${VM_START}" = 'yes' ]; then
+            if [ "${VM_AUTOSTART}" = 'yes' ]; then
                 virsh autostart  ${VM_NAME}
             fi
         done
@@ -184,15 +188,15 @@ case "${VM_LIST_FROM}" in
             VM_NAME=`echo $LINE | cut -f 1 -d ,`
             VM_NAME=`echo $VM_NAME`
             # 匹配？
-            if [ `F_VM_SEARCH "${VM_START}" > /dev/null; echo $?` ]; then
-                echo -e "\n峰哥说：虚拟机【${VM_START}】没找到，跳过！\n"
+            if [ `F_VM_SEARCH "${VM_NAME}" > /dev/null; echo $?` -ne 0 ]; then
+                echo -e "\n峰哥说：虚拟机【${VM_NAME}】没找到，跳过！\n"
                 continue
             fi
             #
             if [ "${VM_START}" = 'yes' ]; then
                 virsh start  ${VM_NAME}
             fi
-            if [ "${VM_START}" = 'yes' ]; then
+            if [ "${VM_AUTOSTART}" = 'yes' ]; then
                 virsh autostart  ${VM_NAME}
             fi
         done < ${VM_LIST_TMP}
@@ -210,7 +214,7 @@ case "${VM_LIST_FROM}" in
         VM_SELECT_LIST=$(echo ${ANSWER})
         VM_SELECT_NUM=$(echo ${#VM_SELECT_LIST})
         #
-        for ((i=0;i<VM_RM_NUM;i++))
+        for ((i=0;i<VM_SELECT_NUM;i++))
         do
             VM_SELECT_No=$(echo ${VM_SELECT_LIST:${i}:1})
             VM_NAME=$(awk '{printf "%c : %-40s %s%s\n", NR+96, $2,$3,$4}' ${VM_LIST_ONLINE} | awk '/'^${VM_SELECT_No}'/{print $3}')
@@ -218,7 +222,7 @@ case "${VM_LIST_FROM}" in
             if [ "${VM_START}" = 'yes' ]; then
                 virsh start  ${VM_NAME}
             fi
-            if [ "${VM_START}" = 'yes' ]; then
+            if [ "${VM_AUTOSTART}" = 'yes' ]; then
                 virsh autostart  ${VM_NAME}
             fi
         done
