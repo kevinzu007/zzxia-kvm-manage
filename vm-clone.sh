@@ -208,6 +208,18 @@ y)
         VM_MEM=`echo $VM_MEM`
         VM_NET=`echo $LINE | cut -f 4 -d ,`
         VM_NET=`echo $VM_NET`
+        VM_IP=`echo $LINE | cut -f 5 -d ,`
+        VM_IP=`echo ${VM_IP}`
+        VM_IP_MASK=`echo $LINE | cut -f 6 -d ,`
+        VM_IP_MASK=`echo ${VM_IP_MASK}`
+        VM_GATEWAY=`echo $LINE | cut -f 7 -d ,`
+        VM_GATEWAY=`echo ${VM_GATEWAY}`
+        VM_DOMAIN=`echo $LINE | cut -f 8 -d ,`
+        VM_DOMAIN=`echo ${VM_DOMAIN}`
+        VM_DNS=`echo $LINE | cut -f 9 -d ,`
+        VM_DNS=`echo ${VM_DNS}`
+        VM_DNS1=`echo ${VM_DNS} | cut -d " " -f 1`
+        VM_DNS2=`echo ${VM_DNS} | cut -d " " -f 2`
         echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
         echo "源模板： ${VM_TEMPLATE}"
         echo "新虚拟机名称：${VM_NAME}"
@@ -237,6 +249,9 @@ y)
         sed -i  s/"domain-${VM_TEMPLATE}"/"domain-${VM_NAME}"/  "${VM_XML_PATH}/${VM_XML}"
         #重新define虚拟机
         virsh define  "${VM_XML_PATH}/${VM_XML}"
+        echo "---------------------------------------------"
+        # 修改vm image
+        ./vm-img-modify.sh  --quiet  "${VM_NAME}"  "${VM_IP}"  "${VM_IP_MASK}"  "${VM_GATEWAY}"  "${VM_DOMAIN}"  "${VM_DNS1}"  "${VM_DNS2}"
     done < ${VM_LIST_TMP}
     ;;
 *)
@@ -245,44 +260,5 @@ y)
 esac
 
 echo  "OK！"
-
-
-
-# 修改vm image
-echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
-echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
-if [ "${QUIET}" = 'no' ]; then
-    echo "你已进入虚拟机信息修改环节，如果虚拟机创建无错误信息，请输入 "'y'""
-    read -p "请输入："  ANSWER
-else
-    ANSWER='y'
-fi
-
-case "${ANSWER}" in
-    y)
-        while read LINE
-        do
-            VM_NAME=`echo $LINE | cut -f 1 -d ,`
-            VM_NAME=`echo ${VM_NAME}`    #---去掉两边的空格
-            VM_IP=`echo $LINE | cut -f 5 -d ,`
-            VM_IP=`echo ${VM_IP}`
-            VM_IP_MASK=`echo $LINE | cut -f 6 -d ,`
-            VM_IP_MASK=`echo ${VM_IP_MASK}`
-            VM_GATEWAY=`echo $LINE | cut -f 7 -d ,`
-            VM_GATEWAY=`echo ${VM_GATEWAY}`
-            VM_DOMAIN=`echo $LINE | cut -f 8 -d ,`
-            VM_DOMAIN=`echo ${VM_DOMAIN}`
-            VM_DNS=`echo $LINE | cut -f 9 -d ,`
-            VM_DNS=`echo ${VM_DNS}`
-            VM_DNS1=`echo ${VM_DNS} | cut -d " " -f 1`
-            VM_DNS2=`echo ${VM_DNS} | cut -d " " -f 2`
-            ./vm-img-modify.sh  --quiet  "${VM_NAME}"  "${VM_IP}"  "${VM_IP_MASK}"  "${VM_GATEWAY}"  "${VM_DOMAIN}"  "${VM_DNS1}"  "${VM_DNS2}"
-        done < ${VM_LIST_TMP}
-        ;;
-    *)
-        echo "小子，好好检查你的虚拟机文件清单吧！"
-        exit 6
-esac
-
 
 
