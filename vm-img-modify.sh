@@ -50,6 +50,28 @@ F_HELP()
 }
 
 
+# 用法：F_VM_SEARCH 虚拟机名
+F_VM_SEARCH ()
+{
+    FS_VM_NAME=$1
+    GET_IT='NO'
+    while read LINE
+    do
+        F_VM_NAME=`echo "$LINE" | awk '{print $2}'`
+        if [ "x${FS_VM_NAME}" = "x${F_VM_NAME}" ]; then
+            GET_IT='YES'
+            break
+        fi
+    done < ${VM_LIST_ONLINE}
+    #
+    if [ "${GET_IT}" = 'YES' ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+
 
 TEMP=`getopt -o hq  -l help,quiet -- "$@"`
 if [ $? != 0 ]; then
@@ -81,10 +103,9 @@ done
 
 
 if [ $# -lt 4 ] ; then
-    F_HELP
+    echo -e "\n缺少参数，请检查！\n"
     exit 1
 fi
-
 
 
 VM_NAME=${1}
@@ -102,6 +123,11 @@ MOUNT_PATH='/mnt/img-disk-1'
 if [ ! -d "${MOUNT_PATH}" ]; then
     mkdir -p "${MOUNT_PATH}"
 fi
+
+
+# 现有vm
+VM_LIST_ONLINE="/tmp/${SH_NAME}-vm.list.online"
+virsh list --all | sed  '1,2d;s/[ ]*//;/^$/d'  > ${VM_LIST_ONLINE}
 
 
 
@@ -130,6 +156,11 @@ fi
 
 
 # 匹配？
+if [ `F_VM_SEARCH  "${VM_NAME}"; echo $?` -ne 0 ]; then
+    echo -e "\n峰哥说：虚拟机【${VM_NAME}】不存在，请检查\n"
+    exit 1
+fi
+
 
 which guestmount >/dev/null 2>&1
 GUESTFS_ERR=$?
