@@ -58,6 +58,7 @@ F_VM_SEARCH ()
     while read LINE
     do
         F_VM_NAME=`echo "$LINE" | awk '{print $2}'`
+        F_VM_STATUS=`echo "$LINE" | awk '{print $3}'`
         if [ "x${FS_VM_NAME}" = "x${F_VM_NAME}" ]; then
             GET_IT='YES'
             break
@@ -65,6 +66,7 @@ F_VM_SEARCH ()
     done < ${VM_LIST_ONLINE}
     #
     if [ "${GET_IT}" = 'YES' ]; then
+        echo -e "${F_VM_STATUS}"
         return 0
     else
         return 1
@@ -156,7 +158,7 @@ fi
 
 
 # 匹配？
-if [ `F_VM_SEARCH  "${VM_NAME}"; echo $?` -ne 0 ]; then
+if [ `F_VM_SEARCH  "${VM_NAME}" > /dev/null; echo $?` -ne 0 ]; then
     echo -e "\n峰哥说：虚拟机【${VM_NAME}】不存在，请检查\n"
     exit 1
 fi

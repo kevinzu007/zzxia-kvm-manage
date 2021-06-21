@@ -45,6 +45,31 @@ F_HELP()
 
 
 
+# 用法：F_VM_SEARCH 虚拟机名
+F_VM_SEARCH ()
+{
+    FS_VM_NAME=$1
+    GET_IT='NO'
+    while read LINE
+    do
+        F_VM_NAME=`echo "$LINE" | awk '{print $2}'`
+        F_VM_STATUS=`echo "$LINE" | awk '{print $3}'`
+        if [ "x${FS_VM_NAME}" = "x${F_VM_NAME}" ]; then
+            GET_IT='YES'
+            break
+        fi
+    done < ${VM_LIST_ONLINE}
+    #
+    if [ "${GET_IT}" = 'YES' ]; then
+        echo -e "${F_VM_STATUS}"
+        return 0
+    else
+        return 1
+    fi
+}
+
+
+
 # 用法：RM_VM  虚拟机名
 RM_VM ()
 {
@@ -52,26 +77,8 @@ RM_VM ()
     echo "------------------------------"
     echo "删除虚拟机：$F_VM_NAME ......"
 
-    # 匹配？
-    # vm ? exist
-    virsh list --all | grep -q "${F_VM_NAME}"
-    ERR1=$?
-    if [ $ERR1 != 0 ]; then
-        echo "${F_VM_NAME} NOT exist !"
-        return 2
-    fi
-    # vm name ? match
-    VM_SEARCH=$(virsh list --all | grep "${F_VM_NAME}" | awk '{print $2}')
-    if [ "${F_VM_NAME}" != "${VM_SEARCH}" ]; then
-        echo "${F_VM_NAME} : vmname NOT match !"
-        return 3
-    fi
-
     # force shutdown
-    ## ?running
-    virsh list | grep "${F_VM_NAME}"
-    RUNNING=$?
-    if [ $RUNNING = 0 ]; then
+    if [ "`F_VM_SEARCH $F_VM_NAME`" = 'running' ]; then
         virsh destroy "${F_VM_NAME}"
     fi
 
@@ -85,7 +92,7 @@ RM_VM ()
             rm  -f "${IMG_FILE}"
             echo 'OK，已删除'
         elif [ "${QUIET}" != "yes"  -a  -n "${IMG_FILE}" ]; then
-            read -t 30 -p "重要提示：需要删除虚拟机镜像文件【${IMG_FILE}】，默认[no]，(yes|no)：" AK
+            read -t 30 -p "重要提示：需要删除虚拟机镜像文件【${IMG_FILE}】，默认[no]，[yes|no]：" AK
             if [ "x${AK}" = 'xyes' ]; then
                 rm  -f "${IMG_FILE}"
                 echo 'OK，已删除'
@@ -130,20 +137,28 @@ do
 done
 
 
-
 #
 if [ $# -eq 0 ]; then
     echo -e "\n峰哥说：请提供需要删除的虚拟机\n"
     exit 2
 fi
 
-#
+
+# 现有vm
+VM_LIST_ONLINE="/tmp/${SH_NAME}-vm.list.online"
+virsh list --all | sed  '1,2d;s/[ ]*//;/^$/d'  > ${VM_LIST_ONLINE}
+
+
 ARG_NUM=$#
 for ((i=1;i<=ARG_NUM;i++))
 do
     VM_NAME=$1
-    RM_VM  ${VM_NAME}
-    echo '------------------------------'
+    if [ `F_VM_SEARCH "${VM_NAME}" > /dev/null; echo $?` -ne 0 ]; then
+        echo -e "\n峰哥说：虚拟机【${VM_NAME}】没找到，跳过！\n"
+    else
+        RM_VM  ${VM_NAME}
+        echo '------------------------------'
+    fi
     shift
 done
 
