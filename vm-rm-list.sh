@@ -15,7 +15,11 @@ SH_PATH=$( cd "$( dirname "$0" )" && pwd )
 cd ${SH_PATH}
 
 
-VM_LIST_ONLINE="/tmp/${SH_NAME}-vm.list"
+# 现有vm
+VM_LIST_ONLINE="/tmp/${SH_NAME}-vm.list.online"
+virsh list --all | sed  '1,2d;s/[ ]*//;/^$/d'  > ${VM_LIST_ONLINE}
+
+
 echo  "虚拟机清单："
 echo "---------------------------------------------"
 virsh list --all > ${VM_LIST_ONLINE}
@@ -41,10 +45,6 @@ for ((i=0;i<VM_RM_NUM;i++))
 do
     VM_RM_NO=$(echo ${VM_RM_LIST:${i}:1})
     VM_RM_NAME=$(awk '{printf "%c : %-40s %s%s\n", NR+96, $2,$3,$4}' ${VM_LIST_ONLINE} | awk '/'^${VM_RM_NO}'/{print $3}')
-    if [ "${VM_RM_NAME}x" = "x" ]; then
-        echo "no this VM, 你耍我吗！"
-        continue
-    fi
     ${SH_PATH}/vm-rm.sh  --quiet  ${VM_RM_NAME}
 done
 
