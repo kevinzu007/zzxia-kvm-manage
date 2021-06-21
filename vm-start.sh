@@ -66,6 +66,31 @@ F_HELP()
 }
 
 
+# 用法：F_VM_SEARCH 虚拟机名
+F_VM_SEARCH ()
+{
+    FS_VM_NAME=$1
+    GET_IT='NO'
+    while read LINE
+    do
+        F_VM_NAME=`echo "$LINE" | awk '{print $2}'`
+        F_VM_STATUS=`echo "$LINE" | awk '{print $3}'`
+        if [ "x${FS_VM_NAME}" = "x${F_VM_NAME}" ]; then
+            GET_IT='YES'
+            break
+        fi
+    done < ${VM_LIST_ONLINE}
+    #
+    if [ "${GET_IT}" = 'YES' ]; then
+        echo -e "${F_VM_STATUS}"
+        return 0
+    else
+        return 1
+    fi
+}
+
+
+
 # 参数检查
 TEMP=`getopt -o hsaf::S  -l help,start,autostart,file::select -- "$@"`
 if [ $? != 0 ]; then
@@ -120,6 +145,11 @@ do
 done
 
 
+# 现有vm
+VM_LIST_ONLINE="/tmp/${SH_NAME}-vm.list.online"
+virsh list --all | sed  '1,2d;s/[ ]*//;/^$/d'  > ${VM_LIST_ONLINE}
+
+
 case "${VM_LIST_FROM}" in
     arg)
         ARG_NUM=$#
@@ -132,6 +162,10 @@ case "${VM_LIST_FROM}" in
             VM_NAME=$1
             shift
             # 匹配？
+            if [ `F_VM_SEARCH "${VM_START}" > /dev/null; echo $?` ]; then
+                echo -e "\n峰哥说：虚拟机【${VM_START}】没找到，跳过！\n"
+                continue
+            fi
             #
             if [ "${VM_START}" = 'yes' ]; then
                 virsh start  ${VM_NAME}
@@ -150,6 +184,10 @@ case "${VM_LIST_FROM}" in
             VM_NAME=`echo $LINE | cut -f 1 -d ,`
             VM_NAME=`echo $VM_NAME`
             # 匹配？
+            if [ `F_VM_SEARCH "${VM_START}" > /dev/null; echo $?` ]; then
+                echo -e "\n峰哥说：虚拟机【${VM_START}】没找到，跳过！\n"
+                continue
+            fi
             #
             if [ "${VM_START}" = 'yes' ]; then
                 virsh start  ${VM_NAME}
@@ -160,11 +198,8 @@ case "${VM_LIST_FROM}" in
         done < ${VM_LIST_TMP}
         ;;
     select)
-        VM_LIST_ONLINE="/tmp/${SH_NAME}-vm.list"
         echo  "虚拟机清单："
         echo "---------------------------------------------"
-        virsh list --all > ${VM_LIST_ONLINE}
-        sed -i -e '1,2d' -e '/^$/d' -e '/^[ ]*$/d'  ${VM_LIST_ONLINE}
         awk '{printf "%c : %-40s %s %s\n", NR+96, $2,$3,$4}'  ${VM_LIST_ONLINE}
         echo "---------------------------------------------"
         echo "请选择你想操作的虚拟机！"
