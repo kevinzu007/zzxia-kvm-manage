@@ -110,7 +110,6 @@ RM_VM ()
 TEMP=`getopt -o hq  -l help,quiet -- "$@"`
 if [ $? != 0 ]; then
     echo "参数不合法，退出"
-    F_HELP
     exit 1
 fi
 #
