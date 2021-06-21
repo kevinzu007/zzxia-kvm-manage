@@ -198,6 +198,45 @@ $ ./vm-start.sh -h
         ./vm-start.sh  -a  -A  vm1 vm2      #--- 自动启动虚拟机【vm1、vm2】
 ```
 
+### 4.7 启动（或自动启动）虚拟机
+```bash
+$ ./vm-shutdown.sh -h
+
+    用途：shutdown虚拟机
+    依赖：
+    注意：本脚本在centos 7上测试通过
+    用法：
+        ./vm-shutdown.sh  [-h|--help]
+        ./vm-shutdown.sh  [ [-f|--file {清单文件}] | [-S|--select] | [-A|--ARG {虚拟机1} {虚拟机2} ... {虚拟机n}] ]
+    参数说明：
+        $0   : 代表脚本本身
+        []   : 代表是必选项
+        <>   : 代表是可选项
+        |    : 代表左右选其一
+        {}   : 代表参数值，请替换为具体参数值
+        %    : 代表通配符，非精确值，可以被包含
+        #
+        -h|--help      此帮助
+        -f|--file      从文件选择虚拟机（默认），默认文件为【./list.csv】
+            文件格式如下（字段之间用【,】分隔）：
+            #VM_NAME,CPU(个),MEM(GB),NET名, IP1,IP_MASK1,GATEWAY1 ,DOMAIN,DNS1 DNS2
+            v-192-168-1-2-nextcloud,2,4,br1, 192.168.1.2,24,192.168.11.1, zjlh.lan,192.168.11.3 192.168.11.4
+            v-192-168-1-3-nexxxx,2,4,br1, 192.168.1.3,24,192.168.11.1, zjlh.lan,192.168.11.3
+        -S|--select    从KVM中选择虚拟机
+        -A|--ARG       从参数获取虚拟机
+    示例:
+        #
+        ./vm-shutdown.sh  -h
+        # 一般（默认从默认文件）
+        ./vm-shutdown.sh                   #--- shutdown默认虚拟机清单文件【./list.csv】中的虚拟机
+        # 从指定文件
+        ./vm-shutdown.sh  -f my_vm.list    #--- shutdown虚拟机清单文件【my_vm.list】中的虚拟机
+        # 我选择
+        ./vm-shutdown.sh  -S               #--- shutdown我选择的虚拟机
+        # 指定虚拟机
+        ./vm-shutdown.sh  -A  vm1 vm2      #--- shutdown虚拟机【vm1、vm2】
+```
+
 ## 5 参与贡献
 
 1.  Fork 本仓库
