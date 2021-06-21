@@ -66,6 +66,30 @@ F_HELP()
 }
 
 
+
+# 用法：F_VM_SEARCH 虚拟机名
+F_VM_SEARCH ()
+{
+    FS_VM_NAME=$1
+    GET_IT='NO'
+    while read LINE
+    do
+        F_VM_NAME=`echo "$LINE" | awk '{print $2}'`
+        if [ "x${FS_VM_NAME}" = "x${F_VM_NAME}" ]; then
+            GET_IT='YES'
+            break
+        fi
+    done < ${VM_LIST_ONLINE}
+    #
+    if [ "${GET_IT}" = 'YES' ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+
+
 # 参数检查
 TEMP=`getopt -o hf:qt:  -l help,file:,quiet,template: -- "$@"`
 if [ $? != 0 ]; then
@@ -108,24 +132,25 @@ do
 done
 
 
-#
+# vm清单
 if [ ! -f "${VM_LIST}" ] ; then
     echo -e "\n峰哥说：${VM_LIST}文件不存在，请检查！\n"
     exit 2
 fi
-
 #
 VM_LIST_TMP="${VM_LIST}.tmp"
-sed  -e '/^#/d' -e '/^$/d' -e '/^[ ]*$/d' ${VM_LIST} >${VM_LIST_TMP}
+sed  -e '/^#/d' -e '/^$/d' -e '/^[ ]*$/d' ${VM_LIST}  > ${VM_LIST_TMP}
+
+
+# 现有vm
+VM_LIST_ONLINE="/tmp/${SH_NAME}-vm.list.online"
+virsh list --all | sed  '1,2d;s/[ ]*//;/^$/d'  > ${VM_LIST_ONLINE}
+
 
 
 # 模板
-VM_LIST_ONLINE="/tmp/${SH_NAME}-vm.list.online"
-virsh list --all > ${VM_LIST_ONLINE}
-sed -i '1,2d;s/[ ]*//;/^$/d'  ${VM_LIST_ONLINE}
-#
 if [ -n "${VM_TEMPLATE}" ]; then
-    if [ `grep  -q  "${VM_TEMPLATE}"  ${VM_LIST_ONLINE}; echo $?` -ne 0 ]; then
+    if [ `F_VM_SEARCH  "${VM_TEMPLATE}"; echo $?` -ne 0 ]; then
         echo -e "\n峰哥说：模板【${VM_TEMPLATE}】不存在，请检查！\n"
         exit 1
     fi
@@ -133,7 +158,7 @@ else
     if [ "${QUIET}" = "no" ]; then
         echo  "虚拟机模板："
         echo "---------------------------------------------"
-        awk '{printf "%c : %-40s %s %s\n", NR+96, $2,$3,$4}' ${VM_LIST_ONLINE}
+        awk '{printf "%c : %-40s %s %s\n", NR+96,$2,$3,$4}' ${VM_LIST_ONLINE}
         echo "---------------------------------------------"
         echo "请选择你想使用的模版，如果模版机在“running”状态，可能会clone失败！"
         read -p "请输入："  ANSWER
@@ -249,7 +274,7 @@ case "${ANSWER}" in
             VM_DNS1=`echo ${VM_DNS} | cut -d " " -f 1`
             VM_DNS2=`echo ${VM_DNS} | cut -d " " -f 2`
             ./vm-img-modify.sh  --quiet  "${VM_NAME}"  "${VM_IP}"  "${VM_IP_MASK}"  "${VM_GATEWAY}"  "${VM_DOMAIN}"  "${VM_DNS1}"  "${VM_DNS2}"
-        done<${VM_LIST_TMP}
+        done < ${VM_LIST_TMP}
         ;;
     *)
         echo "小子，好好检查你的虚拟机文件清单吧！"
