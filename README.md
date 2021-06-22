@@ -121,39 +121,7 @@ $ ./vm-img-modify.sh
         ./vm-img-modify.sh  -q  v-192-168-1-3-nexxxx  192.168.1.3  24  192.168.11.1  zjlh.lan  192.168.11.3  192.168.11.4
 ```
 
-### 4.4 删除虚拟机
-```bash
-$ ./vm-rm.sh 
-
-    用途：删除指定名称的kvm虚拟机
-    注意：本脚本在centos 7上测试通过
-    用法：
-        ./vm-rm.sh  [-h|--help]
-        ./vm-rm.sh  <-q|--quiet>  [{VM_NAME1}]  {VM_NAME2} ... {VM_NAMEn}
-    参数说明：
-        $0   : 代表脚本本身
-        []   : 代表是必选项
-        <>   : 代表是可选项
-        |    : 代表左右选其一
-        {}   : 代表参数值，请替换为具体参数值
-        %    : 代表通配符，非精确值，可以被包含
-        #
-        -h|--help      此帮助
-        -q|--quiet     静默方式
-    示例:
-        #
-        ./vm-rm.sh  虚拟机1
-        ./vm-rm.sh  虚拟机1  虚拟机2
-        # 静默
-        ./vm-rm.sh  -q  虚拟机1  虚拟机2
-```
-
-### 4.5 从列表中选择要删除的虚拟机
-```bash
-$ ./vm-rm-list.sh
-```
-
-### 4.6 启动（或自动启动）虚拟机
+### 4.4 启动（或自动启动）虚拟机
 ```bash
 $ ./vm-start.sh -h
 
@@ -199,7 +167,7 @@ $ ./vm-start.sh -h
         ./vm-start.sh  -a  -A  vm1 vm2      #--- 自动启动虚拟机【vm1、vm2】
 ```
 
-### 4.7 关闭虚拟机
+### 4.5 关闭虚拟机
 ```bash
 $ ./vm-shutdown.sh -h
 
@@ -242,6 +210,51 @@ $ ./vm-shutdown.sh -h
         ./vm-shutdown.sh  -q  -f my_vm.list #--- shutdown虚拟机清单文件【my_vm.list】中的虚拟机，用静默方式
         ./vm-shutdown.sh  -q  -S           #--- shutdown我选择的虚拟机，用静默方式
         ./vm-shutdown.sh  -q  -A  vm1 vm2  #--- shutdown虚拟机【vm1、vm2】，用静默方式
+```
+
+### 4.6 删除虚拟机
+```bash
+$ ./vm-rm.sh -h
+
+    用途：删除虚拟机
+    依赖：
+    注意：本脚本在centos 7上测试通过
+    用法：
+        ./vm-rm.sh  [-h|--help]
+        ./vm-rm.sh  <-q|--quiet>  [ [-f|--file {清单文件}] | [-S|--select] | [-A|--ARG {虚拟机1} {虚拟机2} ... {虚拟机n}] ]
+    参数说明：
+        $0   : 代表脚本本身
+        []   : 代表是必选项
+        <>   : 代表是可选项
+        |    : 代表左右选其一
+        {}   : 代表参数值，请替换为具体参数值
+        %    : 代表通配符，非精确值，可以被包含
+        #
+        -h|--help      此帮助
+        -f|--file      从文件选择虚拟机（默认），默认文件为【./list.csv】
+            文件格式如下（字段之间用【,】分隔）：
+            #VM_NAME,CPU(个),MEM(GB),NET名, IP1,IP_MASK1,GATEWAY1 ,DOMAIN,DNS1 DNS2
+            v-192-168-1-2-nextcloud,2,4,br1, 192.168.1.2,24,192.168.11.1, zjlh.lan,192.168.11.3 192.168.11.4
+            v-192-168-1-3-nexxxx,2,4,br1, 192.168.1.3,24,192.168.11.1, zjlh.lan,192.168.11.3
+        -S|--select    从KVM中选择虚拟机
+        -A|--ARG       从参数获取虚拟机
+        -q|--quiet     静默方式
+    示例:
+        #
+        ./vm-rm.sh  -h
+        # 一般（默认从默认文件）
+        ./vm-rm.sh                   #--- 删除默认虚拟机清单文件【./list.csv】中的虚拟机
+        # 从指定文件
+        ./vm-rm.sh  -f my_vm.list    #--- 删除虚拟机清单文件【my_vm.list】中的虚拟机
+        # 我选择
+        ./vm-rm.sh  -S               #--- 删除我选择的虚拟机
+        # 指定虚拟机
+        ./vm-rm.sh  -A  vm1 vm2      #--- 删除虚拟机【vm1、vm2】
+        # 静默方式
+        ./vm-rm.sh  -q               #--- 删除默认虚拟机清单文件【./list.csv】中的虚拟机，用静默方式
+        ./vm-rm.sh  -q  -f my_vm.list #--- 删除虚拟机清单文件【my_vm.list】中的虚拟机，用静默方式
+        ./vm-rm.sh  -q  -S           #--- 删除我选择的虚拟机，用静默方式
+        ./vm-rm.sh  -q  -A  vm1 vm2  #--- 删除虚拟机【vm1、vm2】，用静默方式
 ```
 
 ## 5 参与贡献
