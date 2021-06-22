@@ -130,6 +130,7 @@ $ ./vm-start.sh -h
     注意：本脚本在centos 7上测试通过
     用法：
         ./vm-start.sh  [-h|--help]
+        ./vm-start.sh  [-l|--list]
         ./vm-start.sh  [ <-s|--start>  <-a|--autostart> ]  [ [-f|--file {清单文件}] | [-S|--select] | [-A|--ARG {虚拟机1} {虚拟机2} ... {虚拟机n}] ]
     参数说明：
         $0   : 代表脚本本身
@@ -140,6 +141,7 @@ $ ./vm-start.sh -h
         %    : 代表通配符，非精确值，可以被包含
         #
         -h|--help      此帮助
+        -l|--list      列出KVM上的虚拟机
         -s|--start     启动虚拟机
         -a|--autostart 开启自动启动虚拟机
         -f|--file      从文件选择虚拟机（默认），默认文件为【./list.csv】
@@ -151,7 +153,8 @@ $ ./vm-start.sh -h
         -A|--ARG       从参数获取虚拟机
     示例:
         #
-        ./vm-start.sh  -h
+        ./vm-start.sh  -h                   #--- 帮助
+        ./vm-start.sh  -l                   #--- 列出KVM上的虚拟机
         # 一般（默认从默认文件）
         ./vm-start.sh  -s                   #--- 启动默认虚拟机清单文件【./list.csv】中的虚拟机
         ./vm-start.sh  -s  -a               #--- 启动默认虚拟机清单文件【./list.csv】中的虚拟机，并设置为自动启动
@@ -176,6 +179,7 @@ $ ./vm-shutdown.sh -h
     注意：本脚本在centos 7上测试通过
     用法：
         ./vm-shutdown.sh  [-h|--help]
+        ./vm-shutdown.sh  [-l|--list]
         ./vm-shutdown.sh  <-q|--quiet>  [ [-f|--file {清单文件}] | [-S|--select] | [-A|--ARG {虚拟机1} {虚拟机2} ... {虚拟机n}] ]
     参数说明：
         $0   : 代表脚本本身
@@ -186,6 +190,7 @@ $ ./vm-shutdown.sh -h
         %    : 代表通配符，非精确值，可以被包含
         #
         -h|--help      此帮助
+        -l|--list      列出KVM上的虚拟机
         -f|--file      从文件选择虚拟机（默认），默认文件为【./list.csv】
             文件格式如下（字段之间用【,】分隔）：
             #VM_NAME,CPU(个),MEM(GB),NET名, IP1,IP_MASK1,GATEWAY1 ,DOMAIN,DNS1 DNS2
@@ -196,7 +201,8 @@ $ ./vm-shutdown.sh -h
         -q|--quiet     静默方式
     示例:
         #
-        ./vm-shutdown.sh  -h
+        ./vm-shutdown.sh  -h               #--- 帮助
+        ./vm-shutdown.sh  -l               #--- 列出KVM上的虚拟机
         # 一般（默认从默认文件）
         ./vm-shutdown.sh                   #--- shutdown默认虚拟机清单文件【./list.csv】中的虚拟机
         # 从指定文件
@@ -221,6 +227,7 @@ $ ./vm-rm.sh -h
     注意：本脚本在centos 7上测试通过
     用法：
         ./vm-rm.sh  [-h|--help]
+        ./vm-rm.sh  [-l|--list]
         ./vm-rm.sh  <-q|--quiet>  [ [-f|--file {清单文件}] | [-S|--select] | [-A|--ARG {虚拟机1} {虚拟机2} ... {虚拟机n}] ]
     参数说明：
         $0   : 代表脚本本身
@@ -231,6 +238,7 @@ $ ./vm-rm.sh -h
         %    : 代表通配符，非精确值，可以被包含
         #
         -h|--help      此帮助
+        -l|--list      列出KVM上的虚拟机
         -f|--file      从文件选择虚拟机（默认），默认文件为【./list.csv】
             文件格式如下（字段之间用【,】分隔）：
             #VM_NAME,CPU(个),MEM(GB),NET名, IP1,IP_MASK1,GATEWAY1 ,DOMAIN,DNS1 DNS2
@@ -241,7 +249,8 @@ $ ./vm-rm.sh -h
         -q|--quiet     静默方式
     示例:
         #
-        ./vm-rm.sh  -h
+        ./vm-rm.sh  -h               #--- 帮助
+        ./vm-rm.sh  -l               #--- 列出KVM上的虚拟机
         # 一般（默认从默认文件）
         ./vm-rm.sh                   #--- 删除默认虚拟机清单文件【./list.csv】中的虚拟机
         # 从指定文件

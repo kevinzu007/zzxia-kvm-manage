@@ -121,9 +121,11 @@ do
             ;;
         -l|--list)
             echo  "KVM虚拟机清单："
-            echo "---------------------------------------------"
-            awk '{printf "%3s : %-40s %s %s\n", NR, $2,$3,$4}'  ${VM_LIST_ONLINE}
-            echo "---------------------------------------------"
+            #echo "---------------------------------------------"
+            #awk '{printf "%3s : %-40s %s %s\n", NR, $2,$3,$4}'  ${VM_LIST_ONLINE}
+            #echo "---------------------------------------------"
+            awk '{printf "%s,%s %s\n", $2,$3,$4}'  ${VM_LIST_ONLINE} > /tmp/vm.list
+            ${SH_PATH}/format_table.sh  -d ','  -t 'NAME,STATUS'  -f /tmp/vm.list
             exit
             ;;
         -s|--start)
