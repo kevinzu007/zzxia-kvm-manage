@@ -27,6 +27,7 @@ F_HELP()
     注意：本脚本在centos 7上测试通过
     用法：
         $0  [-h|--help]
+        $0  [-l|--list]
         $0  [ <-s|--start>  <-a|--autostart> ]  [ [-f|--file {清单文件}] | [-S|--select] | [-A|--ARG {虚拟机1} {虚拟机2} ... {虚拟机n}] ]
     参数说明：
         \$0   : 代表脚本本身
@@ -37,6 +38,7 @@ F_HELP()
         %    : 代表通配符，非精确值，可以被包含
         #
         -h|--help      此帮助
+        -l|--list      列出KVM上的虚拟机
         -s|--start     启动虚拟机
         -a|--autostart 开启自动启动虚拟机
         -f|--file      从文件选择虚拟机（默认），默认文件为【./list.csv】
@@ -48,7 +50,8 @@ F_HELP()
         -A|--ARG       从参数获取虚拟机
     示例:
         #
-        $0  -h
+        $0  -h                   #--- 帮助
+        $0  -l                   #--- 列出KVM上的虚拟机
         # 一般（默认从默认文件）
         $0  -s                   #--- 启动默认虚拟机清单文件【./list.csv】中的虚拟机
         $0  -s  -a               #--- 启动默认虚拟机清单文件【./list.csv】中的虚拟机，并设置为自动启动
@@ -92,13 +95,18 @@ F_VM_SEARCH ()
 
 
 # 参数检查
-TEMP=`getopt -o hsaf:SA  -l help,start,autostart,file:,select,ARG -- "$@"`
+TEMP=`getopt -o hlsaf:SA  -l help,list,start,autostart,file:,select,ARG -- "$@"`
 if [ $? != 0 ]; then
     echo "参数不合法，退出"
     exit 1
 fi
 #
 eval set -- "${TEMP}"
+
+
+# 现有vm
+VM_LIST_ONLINE="/tmp/${SH_NAME}-vm.list.online"
+virsh list --all | sed  '1,2d;s/[ ]*//;/^$/d'  > ${VM_LIST_ONLINE}
 
 
 VM_START='no'
@@ -109,6 +117,13 @@ do
     case "$1" in
         -h|--help)
             F_HELP
+            exit
+            ;;
+        -l|--list)
+            echo  "KVM虚拟机清单："
+            echo "---------------------------------------------"
+            awk '{printf "%3s : %-40s %s %s\n", NR+96, $2,$3,$4}'  ${VM_LIST_ONLINE}
+            echo "---------------------------------------------"
             exit
             ;;
         -s|--start)
@@ -146,11 +161,6 @@ do
             ;;
     esac
 done
-
-
-# 现有vm
-VM_LIST_ONLINE="/tmp/${SH_NAME}-vm.list.online"
-virsh list --all | sed  '1,2d;s/[ ]*//;/^$/d'  > ${VM_LIST_ONLINE}
 
 
 case "${VM_LIST_FROM}" in
