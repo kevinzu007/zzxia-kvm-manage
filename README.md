@@ -208,7 +208,7 @@ $ ./vm-shutdown.sh -h
     注意：本脚本在centos 7上测试通过
     用法：
         ./vm-shutdown.sh  [-h|--help]
-        ./vm-shutdown.sh  [ [-f|--file {清单文件}] | [-S|--select] | [-A|--ARG {虚拟机1} {虚拟机2} ... {虚拟机n}] ]
+        ./vm-shutdown.sh  <-q|--quiet>  [ [-f|--file {清单文件}] | [-S|--select] | [-A|--ARG {虚拟机1} {虚拟机2} ... {虚拟机n}] ]
     参数说明：
         $0   : 代表脚本本身
         []   : 代表是必选项
@@ -225,6 +225,7 @@ $ ./vm-shutdown.sh -h
             v-192-168-1-3-nexxxx,2,4,br1, 192.168.1.3,24,192.168.11.1, zjlh.lan,192.168.11.3
         -S|--select    从KVM中选择虚拟机
         -A|--ARG       从参数获取虚拟机
+        -q|--quiet     静默方式
     示例:
         #
         ./vm-shutdown.sh  -h
@@ -236,6 +237,11 @@ $ ./vm-shutdown.sh -h
         ./vm-shutdown.sh  -S               #--- shutdown我选择的虚拟机
         # 指定虚拟机
         ./vm-shutdown.sh  -A  vm1 vm2      #--- shutdown虚拟机【vm1、vm2】
+        # 静默方式
+        ./vm-shutdown.sh  -q               #--- shutdown默认虚拟机清单文件【./list.csv】中的虚拟机，用静默方式
+        ./vm-shutdown.sh  -q  -f my_vm.list #--- shutdown虚拟机清单文件【my_vm.list】中的虚拟机，用静默方式
+        ./vm-shutdown.sh  -q  -S           #--- shutdown我选择的虚拟机，用静默方式
+        ./vm-shutdown.sh  -q  -A  vm1 vm2  #--- shutdown虚拟机【vm1、vm2】，用静默方式
 ```
 
 ## 5 参与贡献

@@ -168,7 +168,7 @@ case "${VM_LIST_FROM}" in
                 virsh shutdown  ${VM_NAME}
             else
                 echo "准备shutdown虚拟机【${VM_NAME}】"
-                read  -t 30  -p "请确认，默认[y]，[y|n]：" ACK
+                read  -t 30  -p "请确认，默认[n]，[y|n]：" ACK
                 if [ "x${ACK}" = 'xy' ]; then
                     virsh shutdown  ${VM_NAME}
                 else
@@ -195,7 +195,7 @@ case "${VM_LIST_FROM}" in
                 virsh shutdown  ${VM_NAME}
             else
                 echo "准备shutdown虚拟机【${VM_NAME}】"
-                read  -t 30  -p "请确认，默认[y]，[y|n]：" ACK
+                read  -t 30  -p "请确认，默认[n]，[y|n]：" ACK
                 if [ "x${ACK}" = 'xy' ]; then
                     virsh shutdown  ${VM_NAME}
                 else
@@ -226,7 +226,7 @@ case "${VM_LIST_FROM}" in
                 virsh shutdown  ${VM_NAME}
             else
                 echo "准备shutdown虚拟机【${VM_NAME}】"
-                read  -t 30  -p "请确认，默认[y]，[y|n]：" ACK
+                read  -t 30  -p "请确认，默认[n]，[y|n]：" ACK
                 if [ "x${ACK}" = 'xy' ]; then
                     virsh shutdown  ${VM_NAME}
                 else

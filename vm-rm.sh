@@ -156,9 +156,19 @@ do
     if [ `F_VM_SEARCH "${VM_NAME}" > /dev/null; echo $?` -ne 0 ]; then
         echo -e "\n峰哥说：虚拟机【${VM_NAME}】没找到，跳过！\n"
     else
-        RM_VM  ${VM_NAME}
-        echo '------------------------------'
+        if [ "${QUIET}" = 'yes' ]; then
+            RM_VM  ${VM_NAME}
+        else
+            echo "准备删除虚拟机【${VM_NAME}】"
+            read  -t 30  -p "请确认，默认[n]，[y|n]：" ACK
+            if [ "x${ACK}" = 'xy' ]; then
+                RM_VM  ${VM_NAME}
+            else
+                echo "OK，跳过"
+            fi
+        fi
     fi
+    echo '------------------------------'
 done
 
 
