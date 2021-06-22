@@ -12,7 +12,8 @@ SH_PATH=$( cd "$( dirname "$0" )" && pwd )
 cd ${SH_PATH}
 
 # 引入env
-#. ${SH_PATH}/kvm.env
+. ${SH_PATH}/kvm.env
+#QUIET=
 
 # 本地env
 VM_LIST="${SH_PATH}/list.csv"
@@ -27,7 +28,7 @@ F_HELP()
     注意：本脚本在centos 7上测试通过
     用法：
         $0  [-h|--help]
-        $0  [ [-f|--file {清单文件}] | [-S|--select] | [-A|--ARG {虚拟机1} {虚拟机2} ... {虚拟机n}] ]
+        $0  <-q|--quiet>  [ [-f|--file {清单文件}] | [-S|--select] | [-A|--ARG {虚拟机1} {虚拟机2} ... {虚拟机n}] ]
     参数说明：
         \$0   : 代表脚本本身
         []   : 代表是必选项
@@ -44,6 +45,7 @@ F_HELP()
             v-192-168-1-3-nexxxx,2,4,br1, 192.168.1.3,24,192.168.11.1, zjlh.lan,192.168.11.3
         -S|--select    从KVM中选择虚拟机
         -A|--ARG       从参数获取虚拟机
+        -q|--quiet     静默方式
     示例:
         #
         $0  -h
@@ -55,6 +57,11 @@ F_HELP()
         $0  -S               #--- shutdown我选择的虚拟机
         # 指定虚拟机
         $0  -A  vm1 vm2      #--- shutdown虚拟机【vm1、vm2】
+        # 静默方式
+        $0  -q               #--- shutdown默认虚拟机清单文件【./list.csv】中的虚拟机，用静默方式
+        $0  -q  -f my_vm.list #--- shutdown虚拟机清单文件【my_vm.list】中的虚拟机，用静默方式
+        $0  -q  -S           #--- shutdown我选择的虚拟机，用静默方式
+        $0  -q  -A  vm1 vm2  #--- shutdown虚拟机【vm1、vm2】，用静默方式
     "
 }
 
@@ -85,7 +92,7 @@ F_VM_SEARCH ()
 
 
 # 参数检查
-TEMP=`getopt -o hf:SA  -l help,file:,select,ARG -- "$@"`
+TEMP=`getopt -o hf:SAq  -l help,file:,select,ARG,quiet -- "$@"`
 if [ $? != 0 ]; then
     echo "参数不合法，退出"
     exit 1
@@ -117,6 +124,10 @@ do
             ;;
         -A|--ARG)
             VM_LIST_FROM='arg'
+            shift
+            ;;
+        -q|--quiet)
+            QUIET='yes'
             shift
             ;;
         --)
@@ -153,7 +164,17 @@ case "${VM_LIST_FROM}" in
                 continue
             fi
             #
-            virsh shutdown  ${VM_NAME}
+            if [ "${QUIET}" = 'yes' ]; then
+                virsh shutdown  ${VM_NAME}
+            else
+                echo "准备shutdown虚拟机【${VM_NAME}】"
+                read  -t 30  -p "请确认，默认[y]，[y|n]：" ACK
+                if [ "x${ACK}" = 'xy' ]; then
+                    virsh shutdown  ${VM_NAME}
+                else
+                    echo "OK，跳过"
+                fi
+            fi
         done
         ;;
     file)
@@ -170,7 +191,17 @@ case "${VM_LIST_FROM}" in
                 continue
             fi
             #
-            virsh shutdown  ${VM_NAME}
+            if [ "${QUIET}" = 'yes' ]; then
+                virsh shutdown  ${VM_NAME}
+            else
+                echo "准备shutdown虚拟机【${VM_NAME}】"
+                read  -t 30  -p "请确认，默认[y]，[y|n]：" ACK
+                if [ "x${ACK}" = 'xy' ]; then
+                    virsh shutdown  ${VM_NAME}
+                else
+                    echo "OK，跳过"
+                fi
+            fi
         done < ${VM_LIST_TMP}
         ;;
     select)
@@ -191,7 +222,17 @@ case "${VM_LIST_FROM}" in
             VM_SELECT_No=$(echo ${VM_SELECT_LIST:${i}:1})
             VM_NAME=$(awk '{printf "%c : %-40s %s%s\n", NR+96, $2,$3,$4}' ${VM_LIST_ONLINE} | awk '/'^${VM_SELECT_No}'/{print $3}')
             #
-            virsh shutdown  ${VM_NAME}
+            if [ "${QUIET}" = 'yes' ]; then
+                virsh shutdown  ${VM_NAME}
+            else
+                echo "准备shutdown虚拟机【${VM_NAME}】"
+                read  -t 30  -p "请确认，默认[y]，[y|n]：" ACK
+                if [ "x${ACK}" = 'xy' ]; then
+                    virsh shutdown  ${VM_NAME}
+                else
+                    echo "OK，跳过"
+                fi
+            fi
         done
         ;;
     *)
