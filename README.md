@@ -6,10 +6,10 @@
 ### 1.1 功能：
 1. 克隆虚拟机：通过编辑list.csv文件定义虚拟机信息，然后运行vm-clone.sh，选择克隆模板，然后按照list.csv清单克隆出想要的虚拟机
 1. 修改虚拟机信息：【主机名、IP、IP子网掩码、网关、域名、DNS】，一般主要配合vm-clone.sh使用，也可以单独使用
-1. 批量删除指定虚拟机；批量删除清单中的虚拟机；批量删除选择的虚拟机
 1. 批量启动指定虚拟机；批量启动清单中的虚拟机；批量启动选择的虚拟机
 1. 批量设置自动启动指定虚拟机；批量设置自动启动清单中的虚拟机；批量设置自动启动选择的虚拟机
 1. 批量关闭指定虚拟机；批量关闭清单中的虚拟机；批量关闭选择的虚拟机
+1. 批量删除指定虚拟机；批量删除清单中的虚拟机；批量删除选择的虚拟机
 
 ### 1.2 喜欢她，就满足她：
 1. 【Star】她，让她看到你是爱她的；
@@ -29,7 +29,23 @@ Linux shell
 请使用-h|--help参数运行sh脚本即可看到使用帮助
 除了kvm，你还需要安装guestfs，在centos7上运行`yum install -y  libguestfs-tools`
 
-### 4.1 list.csv
+### 4.1 kvm.env
+根据你的环境修改相关环境变量，这个非常重要，否则你可能运行出错
+```bash
+$ cat kvm.env 
+#!/bin/bash
+# 静默方式
+export QUIET='no'     #--- yes|no
+#
+export VM_XML_PATH='/etc/libvirt/qemu'          #--- KVM虚拟机配置文件路径（系统默认路径，一般无需修改）
+export VM_IMG_PATH='/var/lib/libvirt/images'    #--- 新虚拟机文件路径
+#
+export TEMPLATE_VM_NET_ON_KVM='br1'             #--- 虚拟机模板使用的KVM网卡名
+export TEMPLATE_VM_LV='/dev/mapper/cl-root'                                 #--- 虚拟机模板中挂载到【/】的卷
+export TEMPLATE_VM_NET_1_FILE='/etc/sysconfig/network-scripts/ifcfg-eth0'   #--- 虚拟机模板系统内的网卡配置文件
+```
+
+### 4.2 list.csv
 根据需要定制虚拟机信息，以逗号分隔，用#注释掉不需要的行
 ```csv
 $ cat list.csv 
@@ -45,7 +61,7 @@ v-192-168-11-194-etcd,2,4,br1,192.168.11.194,24,192.168.11.1,zjlh.lan,192.168.11
 #v-192-168-11-196-etcd,2,4,br1,192.168.11.196,24,192.168.11.1,zjlh.lan,192.168.11.3 192.168.11.4
 v-192-168-11-197-repo,2,4,br1,192.168.11.197,24,192.168.11.1,zjlh.lan,192.168.11.3 192.168.11.4
 ```
-### 4.2 克隆
+### 4.3 克隆
 
 **克隆前的建议：**
 - 建议先制作好一个较为完美的模板虚拟机，然后在克隆时选择使用他
@@ -91,7 +107,7 @@ $ ./vm-clone.sh --help
         ./vm-clone.sh  -q  -t v-centos-1               #--- 默认虚拟机清单文件【./list.csv】，静默方式，基于模板【v-centos-1】创建
         ./vm-clone.sh  -q  -t v-centos-1  -f vm.list   #--- 使用虚拟机清单文件【vm.list】，静默方式，基于模板【v-centos-1】创建
 ```
-### 4.3 修改vm信息
+### 4.4 修改vm信息
 ```bash
 $ ./vm-img-modify.sh 
 
@@ -121,7 +137,7 @@ $ ./vm-img-modify.sh
         ./vm-img-modify.sh  -q  v-192-168-1-3-nexxxx  192.168.1.3  24  192.168.11.1  zjlh.lan  192.168.11.3  192.168.11.4
 ```
 
-### 4.4 启动（或自动启动）虚拟机
+### 4.5 启动（或自动启动）虚拟机
 ```bash
 $ ./vm-start.sh -h
 
@@ -170,7 +186,7 @@ $ ./vm-start.sh -h
         ./vm-start.sh  -a  -A  vm1 vm2      #--- 自动启动虚拟机【vm1、vm2】
 ```
 
-### 4.5 关闭虚拟机
+### 4.6 关闭虚拟机
 ```bash
 $ ./vm-shutdown.sh -h
 
@@ -218,7 +234,7 @@ $ ./vm-shutdown.sh -h
         ./vm-shutdown.sh  -q  -A  vm1 vm2  #--- shutdown虚拟机【vm1、vm2】，用静默方式
 ```
 
-### 4.6 删除虚拟机
+### 4.7 删除虚拟机
 ```bash
 $ ./vm-rm.sh -h
 
@@ -266,7 +282,7 @@ $ ./vm-rm.sh -h
         ./vm-rm.sh  -q  -A  vm1 vm2  #--- 删除虚拟机【vm1、vm2】，用静默方式
 ```
 
-### 4.7 删除虚拟机
+### 4.8 列出已有虚拟机
 ```bash
 $ ./vm-list.sh -h
 
