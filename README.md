@@ -1,5 +1,6 @@
 # zzxia-kvm-manage
 
+
 ## 1 介绍
 批量克隆、修改、删除、启动、自动启动、关闭KVM虚拟机。适合小企业使用。
 
@@ -13,8 +14,9 @@
 
 ### 1.2 喜欢她，就满足她：
 1. 【Star】她，让她看到你是爱她的；
-3. 【Issue】她，告诉她有哪些小脾气，她会改的，手动小绵羊；
+2. 【Watching】她，时刻感知她的动态；
 2. 【Fork】她，为她增加新功能，修Bug，让她更加卡哇伊；
+3. 【Issue】她，告诉她有哪些小脾气，她会改的，手动小绵羊；
 4. 【打赏】她，为她买jk；
 <img src="https://img-blog.csdnimg.cn/20210429155627295.jpg?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3poZl9zeQ==,size_16,color_FFFFFF,t_70#pic_center" alt="打赏" style="zoom:50%;" />
 
@@ -22,8 +24,10 @@
 ## 2 软件架构
 Linux shell
 
+
 ## 3 安装教程
 克隆到KVM服务器上即可
+
 
 ## 4 使用说明
 请使用-h|--help参数运行sh脚本即可看到使用帮助
@@ -305,6 +309,7 @@ $ ./vm-list.sh -h
         ./vm-list.sh  -h                   #--- 帮助
         ./vm-list.sh                       #--- 列出KVM上的虚拟机
 ```
+
 
 ## 5 参与贡献
 
