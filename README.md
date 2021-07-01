@@ -33,8 +33,11 @@ Linux shell
 请使用-h|--help参数运行sh脚本即可看到使用帮助
 除了kvm，你还需要安装guestfs，在centos7上运行`yum install -y  libguestfs-tools`
 
-### 4.1 kvm.env
-根据你的环境修改相关环境变量，这个非常重要，否则你可能运行出错
+
+### 4.1 环境变量文件`kvm.env`
+
+基于`kvm.env.sample`创建环境变量文件`kvm.env`，根据你的环境修改相关环境变量，这个非常重要，否则你可能运行出错
+
 ```bash
 $ cat kvm.env 
 #!/bin/bash
@@ -49,8 +52,10 @@ export TEMPLATE_VM_LV='/dev/mapper/cl-root'                                 #---
 export TEMPLATE_VM_NET_1_FILE='/etc/sysconfig/network-scripts/ifcfg-eth0'   #--- 虚拟机模板系统内的网卡配置文件
 ```
 
-### 4.2 list.csv
-根据需要定制虚拟机信息，以逗号分隔，用#注释掉不需要的行
+### 4.2 虚拟机列表文件`list.csv`
+
+基于`list.csv.sample`创建虚拟机列表文件`list.csv`（默认，文件名可以是其他名称），根据自己的需要定制虚拟机信息，以逗号分隔，用#注释掉不需要的行：
+
 ```csv
 $ cat list.csv 
 # VM_NAME,CPU(个),MEM(GB),NET名, IP1,IP_MASK1,GATEWAY1 ,DOMAIN,DNS1 DNS2
@@ -65,6 +70,8 @@ v-192-168-11-194-etcd,2,4,br1,192.168.11.194,24,192.168.11.1,zjlh.lan,192.168.11
 #v-192-168-11-196-etcd,2,4,br1,192.168.11.196,24,192.168.11.1,zjlh.lan,192.168.11.3 192.168.11.4
 v-192-168-11-197-repo,2,4,br1,192.168.11.197,24,192.168.11.1,zjlh.lan,192.168.11.3 192.168.11.4
 ```
+
+
 ### 4.3 克隆
 
 **克隆前的建议：**
@@ -111,7 +118,10 @@ $ ./vm-clone.sh --help
         ./vm-clone.sh  -q  -t v-centos-1               #--- 默认虚拟机清单文件【./list.csv】，静默方式，基于模板【v-centos-1】创建
         ./vm-clone.sh  -q  -t v-centos-1  -f vm.list   #--- 使用虚拟机清单文件【vm.list】，静默方式，基于模板【v-centos-1】创建
 ```
+
+
 ### 4.4 修改vm信息
+
 ```bash
 $ ./vm-img-modify.sh 
 
@@ -142,6 +152,7 @@ $ ./vm-img-modify.sh
 ```
 
 ### 4.5 启动（或自动启动）虚拟机
+
 ```bash
 $ ./vm-start.sh -h
 
@@ -191,6 +202,7 @@ $ ./vm-start.sh -h
 ```
 
 ### 4.6 关闭虚拟机
+
 ```bash
 $ ./vm-shutdown.sh -h
 
@@ -239,6 +251,7 @@ $ ./vm-shutdown.sh -h
 ```
 
 ### 4.7 删除虚拟机
+
 ```bash
 $ ./vm-rm.sh -h
 
@@ -287,6 +300,7 @@ $ ./vm-rm.sh -h
 ```
 
 ### 4.8 列出已有虚拟机
+
 ```bash
 $ ./vm-list.sh -h
 
