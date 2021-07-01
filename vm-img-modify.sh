@@ -77,7 +77,7 @@ F_VM_SEARCH ()
 
 TEMP=`getopt -o hq  -l help,quiet -- "$@"`
 if [ $? != 0 ]; then
-    echo "参数不合法！【请查看帮助：\$0 --help】"
+    echo "参数不合法，请查看帮助【$0 --help】"
     exit 1
 fi
 #

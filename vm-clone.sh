@@ -95,7 +95,7 @@ F_VM_SEARCH ()
 # 参数检查
 TEMP=`getopt -o hf:qt:  -l help,file:,quiet,template: -- "$@"`
 if [ $? != 0 ]; then
-    echo "参数不合法，退出"
+    echo "参数不合法，请查看帮助【$0 --help】"
     exit 1
 fi
 #
@@ -126,7 +126,7 @@ do
             break
             ;;
         *)
-            echo "参数不合法！【请查看帮助：\$0 --help】"
+            echo "参数不合法，请查看帮助【$0 --help】"
             exit 1
             ;;
     esac
