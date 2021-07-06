@@ -184,8 +184,11 @@ echo "mount DIRECTORY list : ------------------------------------------------"
 ls ${MOUNT_PATH}
 
 echo "------------------------------------------------"
-# HOSTNAME
+# hostname
 sed -i  "s/.*/${NEW_FQDN}/"  "${MOUNT_PATH}/etc/hostname"
+# hosts
+sed -i  "/${NEW_FQDN}/d"  "${MOUNT_PATH}/etc/hosts"
+echo  "${NEW_IP} ${NEW_FQDN}" >> "${MOUNT_PATH}/etc/hosts"
 # machine-id
 cat /dev/null  > "${MOUNT_PATH}/etc/machine-id"
 # ssh_host_key
