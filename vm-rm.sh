@@ -229,7 +229,7 @@ case "${VM_LIST_FROM}" in
         #
         VM_LIST_TMP="${VM_LIST}.tmp"
         sed  -e '/^#/d' -e '/^$/d' -e '/^[ ]*$/d' ${VM_LIST} > ${VM_LIST_TMP}
-        while read LINE
+        while read -u 3 LINE
         do
             VM_NAME=`echo $LINE | cut -f 1 -d ,`
             VM_NAME=`echo $VM_NAME`
@@ -250,7 +250,7 @@ case "${VM_LIST_FROM}" in
                     echo "OK，跳过"
                 fi
             fi
-        done < ${VM_LIST_TMP}
+        done 3< ${VM_LIST_TMP}
         ;;
     select)
         echo  "虚拟机清单："
