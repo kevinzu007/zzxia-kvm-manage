@@ -234,7 +234,7 @@ y)
             continue
         fi
         # clone
-        virt-clone -o ${VM_TEMPLATE}  -n ${VM_NAME}  -f ${VM_IMG_PATH}/${VM_IMG}  > /tmp/${SH_NAME}-clone-${VM_NAME}.log 2>&1
+        virt-clone -o ${VM_TEMPLATE}  -n ${VM_NAME}  -f ${VM_IMG_PATH}/${VM_IMG}  | tee /tmp/${SH_NAME}-clone-${VM_NAME}.log 2>&1
         if [ `grep -q 'ERROR' /tmp/${SH_NAME}-clone-${VM_NAME}.log; echo $?` -eq 0 ]; then
             echo "【${VM_NAME}】clone error, 请检查!"
             exit 1
