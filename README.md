@@ -56,7 +56,7 @@ export TEMPLATE_VM_NET_1_FILE='/etc/sysconfig/network-scripts/ifcfg-eth0'   #---
 
 基于`my_vm.list.sample`创建虚拟机列表文件`my_vm.list`（默认，文件名可以是其他名称），根据自己的需要定制虚拟机信息，以逗号分隔，用#注释掉不需要的行：
 
-```markdown
+```text
 $ cat  my_vm.list .sample
 # 不需要的行用'#'注释掉
 # 表头也要注释掉
