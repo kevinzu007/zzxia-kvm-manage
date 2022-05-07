@@ -15,7 +15,7 @@ cd ${SH_PATH}
 #. ${SH_PATH}/kvm.env
 
 # 本地env
-VM_LIST="${SH_PATH}/list.csv"
+VM_LIST="${SH_PATH}/my_vm.list"
 
 
 
@@ -41,11 +41,7 @@ F_HELP()
         -l|--list      列出KVM上的虚拟机
         -s|--start     启动虚拟机
         -a|--autostart 开启自动启动虚拟机
-        -f|--file      从文件选择虚拟机（默认），默认文件为【./list.csv】
-            文件格式如下（字段之间用【,】分隔）：
-            #VM_NAME,CPU(个),MEM(GB),NET名, IP1,IP_MASK1,GATEWAY1 ,DOMAIN,DNS1 DNS2
-            v-192-168-1-2-nextcloud,2,4,br1, 192.168.1.2,24,192.168.11.1, zjlh.lan,192.168.11.3 192.168.11.4
-            v-192-168-1-3-nexxxx,2,4,br1, 192.168.1.3,24,192.168.11.1, zjlh.lan,192.168.11.3
+        -f|--file      从文件选择虚拟机（默认），默认文件为【./my_vm.list】，请基于【my_vm.list.sample】创建
         -S|--select    从KVM中选择虚拟机
         -A|--ARG       从参数获取虚拟机
     示例:
@@ -53,12 +49,12 @@ F_HELP()
         $0  -h                   #--- 帮助
         $0  -l                   #--- 列出KVM上的虚拟机
         # 一般（默认从默认文件）
-        $0  -s                   #--- 启动默认虚拟机清单文件【./list.csv】中的虚拟机
-        $0  -s  -a               #--- 启动默认虚拟机清单文件【./list.csv】中的虚拟机，并设置为自动启动
-        $0  -a                   #--- 自动启动默认虚拟机清单文件【./list.csv】中的虚拟机
+        $0  -s                   #--- 启动默认虚拟机清单文件【./my_vm.list】中的虚拟机
+        $0  -s  -a               #--- 启动默认虚拟机清单文件【./my_vm.list】中的虚拟机，并设置为自动启动
+        $0  -a                   #--- 自动启动默认虚拟机清单文件【./my_vm.list】中的虚拟机
         # 从指定文件
-        $0  -s  -f my_vm.list    #--- 启动虚拟机清单文件【my_vm.list】中的虚拟机
-        $0  -a  -f my_vm.list    #--- 自动启动虚拟机清单文件【my_vm.list】中的虚拟机
+        $0  -s  -f xxx.list      #--- 启动虚拟机清单文件【xxx.list】中的虚拟机
+        $0  -a  -f xxx.list      #--- 自动启动虚拟机清单文件【xxx.list】中的虚拟机
         # 我选择
         $0  -s  -S               #--- 启动我选择的虚拟机
         $0  -a  -S               #--- 自动启动我选择的虚拟机

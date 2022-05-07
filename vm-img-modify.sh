@@ -27,7 +27,7 @@ F_HELP()
     注意：本脚本在centos 7上测试通过
     用法：
         $0  [-h|--help]
-        $0  <-q|--quiet>  [ {VM_NAME}  {NEW_IP}  {NEW_IP_MASK}  {NEW_GATEWAY} ]  <{NEW_DOMAIN}>  <{NEW_DNS1}>  <{NEW_DNS2}>
+        $0  <-q|--quiet>  [ {VM_NAME}  {NEW_IP}  {NEW_IP_MASK}  {NEW_GATEWAY} ]  <{NEW_DOMAIN}>  <{NEW_DNS1}<,{NEW_DNS2}>>
     参数说明：
         \$0   : 代表脚本本身
         []   : 代表是必选项
@@ -42,10 +42,11 @@ F_HELP()
         #
         $0  -h        #--- 帮助
         # 一般
-        $0  v-192-168-1-3-nexxxx  192.168.1.3  24  192.168.11.1  zjlh.lan  192.168.11.3  192.168.11.4
+        $0  v-192-168-1-3-nexxxx  192.168.1.3  24  192.168.11.1  zjlh.lan  192.168.11.3,192.168.11.4
+        $0  v-192-168-1-3-nexxxx  192.168.1.3  24  192.168.11.1  zjlh.lan  192.168.11.3
         $0  v-192-168-1-3-nexxxx  192.168.1.3  24  192.168.11.1
         # 静默方式
-        $0  -q  v-192-168-1-3-nexxxx  192.168.1.3  24  192.168.11.1  zjlh.lan  192.168.11.3  192.168.11.4
+        $0  -q  v-192-168-1-3-nexxxx  192.168.1.3  24  192.168.11.1  zjlh.lan  192.168.11.3,192.168.11.4
     "
 }
 
@@ -117,8 +118,9 @@ NEW_IP_MASK=${3}
 NEW_GATEWAY=${4}
 NEW_DOMAIN=${5}
 NEW_FQDN="${NEW_HOSTNAME}.${NEW_DOMAIN}"
-NEW_DNS1="${6}"
-NEW_DNS2="${7}"
+NEW_DNS="${6}"
+NEW_DNS1=`echo ${NEW_DNS} | cut -d "," -f 1`
+NEW_DNS2=`echo ${NEW_DNS} | cut -d "," -f 2`
 
 
 MOUNT_PATH='/mnt/img-disk-1'

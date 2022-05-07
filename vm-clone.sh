@@ -19,7 +19,7 @@ cd ${SH_PATH}
 #QUIET=
 
 # 本地env
-VM_LIST="${SH_PATH}/list.csv"
+VM_LIST="${SH_PATH}/my_vm.list"
 
 
 
@@ -43,25 +43,21 @@ F_HELP()
         %    : 代表通配符，非精确值，可以被包含
         #
         -h|--help      此帮助
-        -f|--file      虚拟机清单文件，默认为【./list.csv】
-            文件格式如下（字段之间用【,】分隔）：
-            #VM_NAME,CPU(个),MEM(GB),NET名, IP1,IP_MASK1,GATEWAY1 ,DOMAIN,DNS1 DNS2
-            v-192-168-1-2-nextcloud,2,4,br1, 192.168.1.2,24,192.168.11.1, zjlh.lan,192.168.11.3 192.168.11.4
-            v-192-168-1-3-nexxxx,2,4,br1, 192.168.1.3,24,192.168.11.1, zjlh.lan,192.168.11.3
+        -f|--file      虚拟机清单文件，默认为【./my_vm.list】，请基于【my_vm.list.sample】创建
         -q|--quiet     静默方式
         -t|--templat   指定虚拟机模板
     示例:
         #
         $0  -h
         # 一般
-        $0                       #--- 默认虚拟机清单文件【./list.csv】，非静默方式，手动选择模板
-        $0  -t v-centos-1        #--- 默认虚拟机清单文件【./list.csv】，非静默方式，基于模板【v-centos-1】创建
+        $0                       #--- 默认虚拟机清单文件【./my_vm.list】，非静默方式，手动选择模板
+        $0  -t v-centos-1        #--- 默认虚拟机清单文件【./my_vm.list】，非静默方式，基于模板【v-centos-1】创建
         # 指定vm清单文件
-        $0  -f vm.list                      #--- 使用虚拟机清单文件【vm.list】，非静默方式，手动选择模
-        $0  -f vm.list  -t v-centos-1       #--- 使用虚拟机清单文件【vm.list】，非静默方式，基于模板【v-centos-1】创建
+        $0  -f xxx.list                      #--- 使用虚拟机清单文件【xxx.list】，非静默方式，手动选择模
+        $0  -f xxx.list  -t v-centos-1       #--- 使用虚拟机清单文件【xxx.list】，非静默方式，基于模板【v-centos-1】创建
         # 静默方式
-        $0  -q  -t v-centos-1               #--- 默认虚拟机清单文件【./list.csv】，静默方式，基于模板【v-centos-1】创建
-        $0  -q  -t v-centos-1  -f vm.list   #--- 使用虚拟机清单文件【vm.list】，静默方式，基于模板【v-centos-1】创建
+        $0  -q  -t v-centos-1                #--- 默认虚拟机清单文件【./my_vm.list】，静默方式，基于模板【v-centos-1】创建
+        $0  -q  -t v-centos-1  -f xxx.list   #--- 使用虚拟机清单文件【xxx.list】，静默方式，基于模板【v-centos-1】创建
     "
 }
 
@@ -197,28 +193,30 @@ case "${ANSWER}" in
 y)
     while read LINE
     do
-        VM_NAME=`echo $LINE | cut -f 1 -d ,`
+        VM_NAME=`echo $LINE | cut -f 2 -d |`
         VM_NAME=`echo $VM_NAME`
         VM_IMG="${VM_NAME}.img"
         VM_XML="${VM_NAME}.xml"
-        VM_CPU=`echo $LINE | cut -f 2 -d ,`
+        VM_CPU=`echo $LINE | cut -f 3 -d |`
         VM_CPU=`echo $VM_CPU`
-        VM_MEM=`echo $LINE | cut -f 3 -d ,`
+        VM_MEM=`echo $LINE | cut -f 4 -d |`
         VM_MEM=`echo $VM_MEM`
-        VM_NET=`echo $LINE | cut -f 4 -d ,`
+        VM_NET=`echo $LINE | cut -f 5 -d |`
         VM_NET=`echo $VM_NET`
-        VM_IP=`echo $LINE | cut -f 5 -d ,`
+        VM_IP=`echo $LINE | cut -f 6 -d |`
         VM_IP=`echo ${VM_IP}`
-        VM_IP_MASK=`echo $LINE | cut -f 6 -d ,`
+        VM_IP_MASK=`echo $LINE | cut -f 7 -d |`
         VM_IP_MASK=`echo ${VM_IP_MASK}`
-        VM_GATEWAY=`echo $LINE | cut -f 7 -d ,`
+        VM_GATEWAY=`echo $LINE | cut -f 8 -d |`
         VM_GATEWAY=`echo ${VM_GATEWAY}`
-        VM_DOMAIN=`echo $LINE | cut -f 8 -d ,`
+        VM_DOMAIN=`echo $LINE | cut -f 9 -d |`
         VM_DOMAIN=`echo ${VM_DOMAIN}`
-        VM_DNS=`echo $LINE | cut -f 9 -d ,`
+        VM_DNS=`echo $LINE | cut -f 10 -d |`
         VM_DNS=`echo ${VM_DNS}`
-        VM_DNS1=`echo ${VM_DNS} | cut -d " " -f 1`
-        VM_DNS2=`echo ${VM_DNS} | cut -d " " -f 2`
+        VM_DNS1=`echo ${VM_DNS} | cut -d "," -f 1`
+        VM_DNS1=`echo ${VM_DNS1}`
+        VM_DNS2=`echo ${VM_DNS} | cut -d "," -f 2`
+        VM_DNS2=`echo ${VM_DNS2}`
         echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
         echo "源模板： ${VM_TEMPLATE}"
         echo "新虚拟机名称：${VM_NAME}"
@@ -250,7 +248,7 @@ y)
         virsh define  "${VM_XML_PATH}/${VM_XML}"
         echo "---------------------------------------------"
         # 修改vm image
-        ./vm-img-modify.sh  --quiet  "${VM_NAME}"  "${VM_IP}"  "${VM_IP_MASK}"  "${VM_GATEWAY}"  "${VM_DOMAIN}"  "${VM_DNS1}"  "${VM_DNS2}"
+        ./vm-img-modify.sh  --quiet  "${VM_NAME}"  "${VM_IP}"  "${VM_IP_MASK}"  "${VM_GATEWAY}"  "${VM_DOMAIN}"  "${VM_DNS1},${VM_DNS2}"
     done < ${VM_LIST_TMP}
     ;;
 *)
