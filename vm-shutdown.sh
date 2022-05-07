@@ -16,7 +16,7 @@ cd ${SH_PATH}
 #QUIET=
 
 # 本地env
-VM_LIST="${SH_PATH}/list.csv"
+VM_LIST="${SH_PATH}/my_vm.list"
 
 
 
@@ -40,11 +40,7 @@ F_HELP()
         #
         -h|--help      此帮助
         -l|--list      列出KVM上的虚拟机
-        -f|--file      从文件选择虚拟机（默认），默认文件为【./list.csv】
-            文件格式如下（字段之间用【,】分隔）：
-            #VM_NAME,CPU(个),MEM(GB),NET名, IP1,IP_MASK1,GATEWAY1 ,DOMAIN,DNS1 DNS2
-            v-192-168-1-2-nextcloud,2,4,br1, 192.168.1.2,24,192.168.11.1, zjlh.lan,192.168.11.3 192.168.11.4
-            v-192-168-1-3-nexxxx,2,4,br1, 192.168.1.3,24,192.168.11.1, zjlh.lan,192.168.11.3
+        -f|--file      从文件选择虚拟机（默认），默认文件为【./my_vm.list】，请基于【my_vm.list.sample】创建
         -S|--select    从KVM中选择虚拟机
         -A|--ARG       从参数获取虚拟机
         -q|--quiet     静默方式
@@ -53,16 +49,16 @@ F_HELP()
         $0  -h               #--- 帮助
         $0  -l               #--- 列出KVM上的虚拟机
         # 一般（默认从默认文件）
-        $0                   #--- shutdown默认虚拟机清单文件【./list.csv】中的虚拟机
+        $0                   #--- shutdown默认虚拟机清单文件【./my_vm.list】中的虚拟机
         # 从指定文件
-        $0  -f my_vm.list    #--- shutdown虚拟机清单文件【my_vm.list】中的虚拟机
+        $0  -f xxx.list      #--- shutdown虚拟机清单文件【xxx.list】中的虚拟机
         # 我选择
         $0  -S               #--- shutdown我选择的虚拟机
         # 指定虚拟机
         $0  -A  vm1 vm2      #--- shutdown虚拟机【vm1、vm2】
         # 静默方式
-        $0  -q               #--- shutdown默认虚拟机清单文件【./list.csv】中的虚拟机，用静默方式
-        $0  -q  -f my_vm.list #--- shutdown虚拟机清单文件【my_vm.list】中的虚拟机，用静默方式
+        $0  -q               #--- shutdown默认虚拟机清单文件【./my_vm.list】中的虚拟机，用静默方式
+        $0  -q  -f xxx.list  #--- shutdown虚拟机清单文件【xxx.list】中的虚拟机，用静默方式
         $0  -q  -S           #--- shutdown我选择的虚拟机，用静默方式
         $0  -q  -A  vm1 vm2  #--- shutdown虚拟机【vm1、vm2】，用静默方式
     "

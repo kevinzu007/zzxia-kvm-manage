@@ -5,7 +5,7 @@
 批量克隆、修改、删除、启动、自动启动、关闭KVM虚拟机。适合小企业使用。
 
 ### 1.1 功能：
-1. 克隆虚拟机：通过编辑list.csv文件定义虚拟机信息，然后运行vm-clone.sh，选择克隆模板，然后按照list.csv清单克隆出想要的虚拟机
+1. 克隆虚拟机：通过编辑my_vm.list文件定义虚拟机信息，然后运行vm-clone.sh，选择克隆模板，然后按照my_vm.list清单克隆出想要的虚拟机
 1. 修改虚拟机信息：【主机名、IP、IP子网掩码、网关、域名、DNS】，一般主要配合vm-clone.sh使用，也可以单独使用
 1. 批量启动指定虚拟机；批量启动清单中的虚拟机；批量启动选择的虚拟机
 1. 批量设置自动启动指定虚拟机；批量设置自动启动清单中的虚拟机；批量设置自动启动选择的虚拟机
@@ -52,23 +52,25 @@ export TEMPLATE_VM_LV='/dev/mapper/cl-root'                                 #---
 export TEMPLATE_VM_NET_1_FILE='/etc/sysconfig/network-scripts/ifcfg-eth0'   #--- 虚拟机模板系统内的网卡配置文件
 ```
 
-### 4.2 虚拟机列表文件`list.csv`
+### 4.2 虚拟机列表文件`my_vm.list`
 
-基于`list.csv.sample`创建虚拟机列表文件`list.csv`（默认，文件名可以是其他名称），根据自己的需要定制虚拟机信息，以逗号分隔，用#注释掉不需要的行：
+基于`my_vm.list.sample`创建虚拟机列表文件`my_vm.list`（默认，文件名可以是其他名称），根据自己的需要定制虚拟机信息，以逗号分隔，用#注释掉不需要的行：
 
-```csv
-$ cat list.csv 
-# VM_NAME,CPU(个),MEM(GB),NET名, IP1,IP_MASK1,GATEWAY1 ,DOMAIN,DNS1 DNS2
-#################################################################################################
-# test
-v-192-168-11-190-deploy,1,2,br1,192.168.11.190,24,192.168.11.1,zjlh.lan,192.168.11.3 192.168.11.4
-v-192-168-11-191-mast,4,8,br1,192.168.11.191,24,192.168.11.1,zjlh.lan,192.168.11.3 192.168.11.4
-v-192-168-11-192-node,4,8,br1,192.168.11.192,24,192.168.11.1,zjlh.lan,192.168.11.3 192.168.11.4
-v-192-168-11-193-node,4,8,br1,192.168.11.193,24,192.168.11.1,zjlh.lan,192.168.11.3 192.168.11.4
-v-192-168-11-194-etcd,2,4,br1,192.168.11.194,24,192.168.11.1,zjlh.lan,192.168.11.3 192.168.11.4
-#v-192-168-11-195-etcd,2,4,br1,192.168.11.195,24,192.168.11.1,zjlh.lan,192.168.11.3 192.168.11.4
-#v-192-168-11-196-etcd,2,4,br1,192.168.11.196,24,192.168.11.1,zjlh.lan,192.168.11.3 192.168.11.4
-v-192-168-11-197-repo,2,4,br1,192.168.11.197,24,192.168.11.1,zjlh.lan,192.168.11.3 192.168.11.4
+```markdown
+$ cat  my_vm.list .sample
+# 不需要的行用'#'注释掉
+# 表头也要注释掉
+#
+#| VM_NAME                 | CPUs | MEM(GB) | NIC  | IP             | IP_MASK | GATEWAY      | DOMAIN   | DNS1,DNS2                  |
+#| ----------------------- | ---- | ------- | ---- | -------------- | ------- | ------------ | -------- | -------------------------- |
+| v-192-168-11-190-deploy | 1    | 2       | br1  | 192.168.11.190 | 24      | 192.168.11.1 | zjlh.lan | 192.168.11.3, 192.168.11.4 |
+| v-192-168-11-191-mast   | 4    | 8       | br1  | 192.168.11.191 | 24      | 192.168.11.1 | zjlh.lan | 192.168.11.3, 192.168.11.4 |
+| v-192-168-11-192-node   | 4    | 8       | br1  | 192.168.11.192 | 24      | 192.168.11.1 | zjlh.lan | 192.168.11.3, 192.168.11.4 |
+#| v-192-168-11-193-node   | 4    | 8       | br1  | 192.168.11.193 | 24      | 192.168.11.1 | zjlh.lan | 192.168.11.3, 192.168.11.4 |
+#| v-192-168-11-194-etcd   | 2    | 4       | br1  | 192.168.11.194 | 24      | 192.168.11.1 | zjlh.lan | 192.168.11.3, 192.168.11.4 |
+#| v-192-168-11-195-etcd   | 2    | 4       | br1  | 192.168.11.195 | 24      | 192.168.11.1 | zjlh.lan | 192.168.11.3, 192.168.11.4 |
+| v-192-168-11-196-etcd   | 2    | 4       | br1  | 192.168.11.196 | 24      | 192.168.11.1 | zjlh.lan | 192.168.11.3, 192.168.11.4 |
+| v-192-168-11-197-repo   | 2    | 4       | br1  | 192.168.11.197 | 24      | 192.168.11.1 | zjlh.lan | 192.168.11.3, 192.168.11.4 |
 ```
 
 
@@ -98,25 +100,21 @@ $ ./vm-clone.sh --help
         %    : 代表通配符，非精确值，可以被包含
         #
         -h|--help      此帮助
-        -f|--file      虚拟机清单文件，默认为【./list.csv】
-            文件格式如下（字段之间用【,】分隔）：
-            #VM_NAME,CPU(个),MEM(GB),NET名, IP1,IP_MASK1,GATEWAY1 ,DOMAIN,DNS1 DNS2
-            v-192-168-1-2-nextcloud,2,4,br1, 192.168.1.2,24,192.168.11.1, zjlh.lan,192.168.11.3 192.168.11.4
-            v-192-168-1-3-nexxxx,2,4,br1, 192.168.1.3,24,192.168.11.1, zjlh.lan,192.168.11.3
+        -f|--file      虚拟机清单文件，默认为【./my_vm.list】，请基于【my_vm.list.sample】创建
         -q|--quiet     静默方式
         -t|--templat   指定虚拟机模板
     示例:
         #
         ./vm-clone.sh  -h
         # 一般
-        ./vm-clone.sh                       #--- 默认虚拟机清单文件【./list.csv】，非静默方式，手动选择模板
-        ./vm-clone.sh  -t v-centos-1        #--- 默认虚拟机清单文件【./list.csv】，非静默方式，基于模板【v-centos-1】创建
+        ./vm-clone.sh                       #--- 默认虚拟机清单文件【./my_vm.list】，非静默方式，手动选择模板
+        ./vm-clone.sh  -t v-centos-1        #--- 默认虚拟机清单文件【./my_vm.list】，非静默方式，基于模板【v-centos-1】创建
         # 指定vm清单文件
-        ./vm-clone.sh  -f vm.list                      #--- 使用虚拟机清单文件【vm.list】，非静默方式，手动选择模
-        ./vm-clone.sh  -f vm.list  -t v-centos-1       #--- 使用虚拟机清单文件【vm.list】，非静默方式，基于模板【v-centos-1】创建
+        ./vm-clone.sh  -f xxx.list                      #--- 使用虚拟机清单文件【xxx.list】，非静默方式，手动选择模
+        ./vm-clone.sh  -f xxx.list  -t v-centos-1       #--- 使用虚拟机清单文件【xxx.list】，非静默方式，基于模板【v-centos-1】创建
         # 静默方式
-        ./vm-clone.sh  -q  -t v-centos-1               #--- 默认虚拟机清单文件【./list.csv】，静默方式，基于模板【v-centos-1】创建
-        ./vm-clone.sh  -q  -t v-centos-1  -f vm.list   #--- 使用虚拟机清单文件【vm.list】，静默方式，基于模板【v-centos-1】创建
+        ./vm-clone.sh  -q  -t v-centos-1                #--- 默认虚拟机清单文件【./my_vm.list】，静默方式，基于模板【v-centos-1】创建
+        ./vm-clone.sh  -q  -t v-centos-1  -f xxx.list   #--- 使用虚拟机清单文件【xxx.list】，静默方式，基于模板【v-centos-1】创建
 ```
 
 
@@ -130,7 +128,7 @@ $ ./vm-img-modify.sh
     注意：本脚本在centos 7上测试通过
     用法：
         ./vm-img-modify.sh  [-h|--help]
-        ./vm-img-modify.sh  <-q|--quiet>  [ {VM_NAME}  {NEW_IP}  {NEW_IP_MASK}  {NEW_GATEWAY} ]  <{NEW_DOMAIN}>  <{NEW_DNS1}>  <{NEW_DNS2}>
+        ./vm-img-modify.sh  <-q|--quiet>  [ {VM_NAME}  {NEW_IP}  {NEW_IP_MASK}  {NEW_GATEWAY} ]  <{NEW_DOMAIN}>  <{NEW_DNS1}<,{NEW_DNS2}>>
     参数说明：
         $0   : 代表脚本本身
         []   : 代表是必选项
@@ -145,10 +143,11 @@ $ ./vm-img-modify.sh
         #
         ./vm-img-modify.sh  -h        #--- 帮助
         # 一般
-        ./vm-img-modify.sh  v-192-168-1-3-nexxxx  192.168.1.3  24  192.168.11.1  zjlh.lan  192.168.11.3  192.168.11.4
+        ./vm-img-modify.sh  v-192-168-1-3-nexxxx  192.168.1.3  24  192.168.11.1  zjlh.lan  192.168.11.3,192.168.11.4
+        ./vm-img-modify.sh  v-192-168-1-3-nexxxx  192.168.1.3  24  192.168.11.1  zjlh.lan  192.168.11.3
         ./vm-img-modify.sh  v-192-168-1-3-nexxxx  192.168.1.3  24  192.168.11.1
         # 静默方式
-        ./vm-img-modify.sh  -q  v-192-168-1-3-nexxxx  192.168.1.3  24  192.168.11.1  zjlh.lan  192.168.11.3  192.168.11.4
+        ./vm-img-modify.sh  -q  v-192-168-1-3-nexxxx  192.168.1.3  24  192.168.11.1  zjlh.lan  192.168.11.3,192.168.11.4
 ```
 
 ### 4.5 启动（或自动启动）虚拟机
@@ -175,11 +174,7 @@ $ ./vm-start.sh -h
         -l|--list      列出KVM上的虚拟机
         -s|--start     启动虚拟机
         -a|--autostart 开启自动启动虚拟机
-        -f|--file      从文件选择虚拟机（默认），默认文件为【./list.csv】
-            文件格式如下（字段之间用【,】分隔）：
-            #VM_NAME,CPU(个),MEM(GB),NET名, IP1,IP_MASK1,GATEWAY1 ,DOMAIN,DNS1 DNS2
-            v-192-168-1-2-nextcloud,2,4,br1, 192.168.1.2,24,192.168.11.1, zjlh.lan,192.168.11.3 192.168.11.4
-            v-192-168-1-3-nexxxx,2,4,br1, 192.168.1.3,24,192.168.11.1, zjlh.lan,192.168.11.3
+        -f|--file      从文件选择虚拟机（默认），默认文件为【./my_vm.list】，请基于【my_vm.list.sample】创建
         -S|--select    从KVM中选择虚拟机
         -A|--ARG       从参数获取虚拟机
     示例:
@@ -187,12 +182,12 @@ $ ./vm-start.sh -h
         ./vm-start.sh  -h                   #--- 帮助
         ./vm-start.sh  -l                   #--- 列出KVM上的虚拟机
         # 一般（默认从默认文件）
-        ./vm-start.sh  -s                   #--- 启动默认虚拟机清单文件【./list.csv】中的虚拟机
-        ./vm-start.sh  -s  -a               #--- 启动默认虚拟机清单文件【./list.csv】中的虚拟机，并设置为自动启动
-        ./vm-start.sh  -a                   #--- 自动启动默认虚拟机清单文件【./list.csv】中的虚拟机
+        ./vm-start.sh  -s                   #--- 启动默认虚拟机清单文件【./my_vm.list】中的虚拟机
+        ./vm-start.sh  -s  -a               #--- 启动默认虚拟机清单文件【./my_vm.list】中的虚拟机，并设置为自动启动
+        ./vm-start.sh  -a                   #--- 自动启动默认虚拟机清单文件【./my_vm.list】中的虚拟机
         # 从指定文件
-        ./vm-start.sh  -s  -f my_vm.list    #--- 启动虚拟机清单文件【my_vm.list】中的虚拟机
-        ./vm-start.sh  -a  -f my_vm.list    #--- 自动启动虚拟机清单文件【my_vm.list】中的虚拟机
+        ./vm-start.sh  -s  -f xxx.list      #--- 启动虚拟机清单文件【xxx.list】中的虚拟机
+        ./vm-start.sh  -a  -f xxx.list      #--- 自动启动虚拟机清单文件【xxx.list】中的虚拟机
         # 我选择
         ./vm-start.sh  -s  -S               #--- 启动我选择的虚拟机
         ./vm-start.sh  -a  -S               #--- 自动启动我选择的虚拟机
@@ -223,11 +218,7 @@ $ ./vm-shutdown.sh -h
         #
         -h|--help      此帮助
         -l|--list      列出KVM上的虚拟机
-        -f|--file      从文件选择虚拟机（默认），默认文件为【./list.csv】
-            文件格式如下（字段之间用【,】分隔）：
-            #VM_NAME,CPU(个),MEM(GB),NET名, IP1,IP_MASK1,GATEWAY1 ,DOMAIN,DNS1 DNS2
-            v-192-168-1-2-nextcloud,2,4,br1, 192.168.1.2,24,192.168.11.1, zjlh.lan,192.168.11.3 192.168.11.4
-            v-192-168-1-3-nexxxx,2,4,br1, 192.168.1.3,24,192.168.11.1, zjlh.lan,192.168.11.3
+        -f|--file      从文件选择虚拟机（默认），默认文件为【./my_vm.list】，请基于【my_vm.list.sample】创建
         -S|--select    从KVM中选择虚拟机
         -A|--ARG       从参数获取虚拟机
         -q|--quiet     静默方式
@@ -236,16 +227,16 @@ $ ./vm-shutdown.sh -h
         ./vm-shutdown.sh  -h               #--- 帮助
         ./vm-shutdown.sh  -l               #--- 列出KVM上的虚拟机
         # 一般（默认从默认文件）
-        ./vm-shutdown.sh                   #--- shutdown默认虚拟机清单文件【./list.csv】中的虚拟机
+        ./vm-shutdown.sh                   #--- shutdown默认虚拟机清单文件【./my_vm.list】中的虚拟机
         # 从指定文件
-        ./vm-shutdown.sh  -f my_vm.list    #--- shutdown虚拟机清单文件【my_vm.list】中的虚拟机
+        ./vm-shutdown.sh  -f xxx.list      #--- shutdown虚拟机清单文件【xxx.list】中的虚拟机
         # 我选择
         ./vm-shutdown.sh  -S               #--- shutdown我选择的虚拟机
         # 指定虚拟机
         ./vm-shutdown.sh  -A  vm1 vm2      #--- shutdown虚拟机【vm1、vm2】
         # 静默方式
-        ./vm-shutdown.sh  -q               #--- shutdown默认虚拟机清单文件【./list.csv】中的虚拟机，用静默方式
-        ./vm-shutdown.sh  -q  -f my_vm.list #--- shutdown虚拟机清单文件【my_vm.list】中的虚拟机，用静默方式
+        ./vm-shutdown.sh  -q               #--- shutdown默认虚拟机清单文件【./my_vm.list】中的虚拟机，用静默方式
+        ./vm-shutdown.sh  -q  -f xxx.list  #--- shutdown虚拟机清单文件【xxx.list】中的虚拟机，用静默方式
         ./vm-shutdown.sh  -q  -S           #--- shutdown我选择的虚拟机，用静默方式
         ./vm-shutdown.sh  -q  -A  vm1 vm2  #--- shutdown虚拟机【vm1、vm2】，用静默方式
 ```
@@ -272,11 +263,7 @@ $ ./vm-rm.sh -h
         #
         -h|--help      此帮助
         -l|--list      列出KVM上的虚拟机
-        -f|--file      从文件选择虚拟机（默认），默认文件为【./list.csv】
-            文件格式如下（字段之间用【,】分隔）：
-            #VM_NAME,CPU(个),MEM(GB),NET名, IP1,IP_MASK1,GATEWAY1 ,DOMAIN,DNS1 DNS2
-            v-192-168-1-2-nextcloud,2,4,br1, 192.168.1.2,24,192.168.11.1, zjlh.lan,192.168.11.3 192.168.11.4
-            v-192-168-1-3-nexxxx,2,4,br1, 192.168.1.3,24,192.168.11.1, zjlh.lan,192.168.11.3
+        -f|--file      从文件选择虚拟机（默认），默认文件为【./my_vm.list】，请基于【my_vm.list.sample】创建
         -S|--select    从KVM中选择虚拟机
         -A|--ARG       从参数获取虚拟机
         -q|--quiet     静默方式
@@ -285,16 +272,16 @@ $ ./vm-rm.sh -h
         ./vm-rm.sh  -h               #--- 帮助
         ./vm-rm.sh  -l               #--- 列出KVM上的虚拟机
         # 一般（默认从默认文件）
-        ./vm-rm.sh                   #--- 删除默认虚拟机清单文件【./list.csv】中的虚拟机
+        ./vm-rm.sh                   #--- 删除默认虚拟机清单文件【./my_vm.list】中的虚拟机
         # 从指定文件
-        ./vm-rm.sh  -f my_vm.list    #--- 删除虚拟机清单文件【my_vm.list】中的虚拟机
+        ./vm-rm.sh  -f xxx.list      #--- 删除虚拟机清单文件【xxx.list】中的虚拟机
         # 我选择
         ./vm-rm.sh  -S               #--- 删除我选择的虚拟机
         # 指定虚拟机
         ./vm-rm.sh  -A  vm1 vm2      #--- 删除虚拟机【vm1、vm2】
         # 静默方式
-        ./vm-rm.sh  -q               #--- 删除默认虚拟机清单文件【./list.csv】中的虚拟机，用静默方式
-        ./vm-rm.sh  -q  -f my_vm.list #--- 删除虚拟机清单文件【my_vm.list】中的虚拟机，用静默方式
+        ./vm-rm.sh  -q               #--- 删除默认虚拟机清单文件【./my_vm.list】中的虚拟机，用静默方式
+        ./vm-rm.sh  -q  -f xxx.list  #--- 删除虚拟机清单文件【xxx.list】中的虚拟机，用静默方式
         ./vm-rm.sh  -q  -S           #--- 删除我选择的虚拟机，用静默方式
         ./vm-rm.sh  -q  -A  vm1 vm2  #--- 删除虚拟机【vm1、vm2】，用静默方式
 ```
