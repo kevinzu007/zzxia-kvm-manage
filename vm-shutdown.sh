@@ -191,7 +191,7 @@ case "${VM_LIST_FROM}" in
         sed  -e '/^#/d' -e '/^$/d' -e '/^[ ]*$/d' ${VM_LIST} > ${VM_LIST_TMP}
         while read -u 3 LINE
         do
-            VM_NAME=`echo $LINE | cut -f 1 -d ,`
+            VM_NAME=`echo $LINE | cut -f 2 -d '|'`
             VM_NAME=`echo $VM_NAME`
             # 匹配？
             if [ `F_VM_SEARCH "${VM_NAME}" > /dev/null; echo $?` -ne 0 ]; then
