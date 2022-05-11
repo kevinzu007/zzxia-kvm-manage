@@ -193,25 +193,25 @@ case "${ANSWER}" in
 y)
     while read LINE
     do
-        VM_NAME=`echo $LINE | cut -f 2 -d |`
+        VM_NAME=`echo $LINE | cut -f 2 -d '|'`
         VM_NAME=`echo $VM_NAME`
         VM_IMG="${VM_NAME}.img"
         VM_XML="${VM_NAME}.xml"
-        VM_CPU=`echo $LINE | cut -f 3 -d |`
+        VM_CPU=`echo $LINE | cut -f 3 -d '|'`
         VM_CPU=`echo $VM_CPU`
-        VM_MEM=`echo $LINE | cut -f 4 -d |`
+        VM_MEM=`echo $LINE | cut -f 4 -d '|'`
         VM_MEM=`echo $VM_MEM`
-        VM_NET=`echo $LINE | cut -f 5 -d |`
+        VM_NET=`echo $LINE | cut -f 5 -d '|'`
         VM_NET=`echo $VM_NET`
-        VM_IP=`echo $LINE | cut -f 6 -d |`
+        VM_IP=`echo $LINE | cut -f 6 -d '|'`
         VM_IP=`echo ${VM_IP}`
-        VM_IP_MASK=`echo $LINE | cut -f 7 -d |`
+        VM_IP_MASK=`echo $LINE | cut -f 7 -d '|'`
         VM_IP_MASK=`echo ${VM_IP_MASK}`
-        VM_GATEWAY=`echo $LINE | cut -f 8 -d |`
+        VM_GATEWAY=`echo $LINE | cut -f 8 -d '|'`
         VM_GATEWAY=`echo ${VM_GATEWAY}`
-        VM_DOMAIN=`echo $LINE | cut -f 9 -d |`
+        VM_DOMAIN=`echo $LINE | cut -f 9 -d '|'`
         VM_DOMAIN=`echo ${VM_DOMAIN}`
-        VM_DNS=`echo $LINE | cut -f 10 -d |`
+        VM_DNS=`echo $LINE | cut -f 10 -d '|'`
         VM_DNS=`echo ${VM_DNS}`
         VM_DNS1=`echo ${VM_DNS} | cut -d "," -f 1`
         VM_DNS1=`echo ${VM_DNS1}`
