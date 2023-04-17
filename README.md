@@ -22,7 +22,7 @@
 2. 【Fork】她，为她增加新功能，修Bug，让她更加卡哇伊；
 3. 【Issue】她，告诉她有哪些小脾气，她会改的，手动小绵羊；
 4. 【打赏】她，为她买jk；
-<img src="https://img-blog.csdnimg.cn/20210429155627295.jpg?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3poZl9zeQ==,size_16,color_FFFFFF,t_70#pic_center" alt="打赏" style="zoom:50%;" />
+<img src="https://gitee.com/zhf_sy/pic-bed/raw/master/dao.png" alt="打赏" style="zoom:40%;" />
 
 
 ## 2 软件架构
@@ -316,6 +316,19 @@ $ ./vm-list.sh -h
         #
         ./vm-list.sh  -h                   #--- 帮助
         ./vm-list.sh                       #--- 列出KVM上的虚拟机
+```
+
+### 4.8 简单管理虚拟机命令
+
+看名字就知道他的用途了
+
+```bash
+./easy-save-all-online-vm-list-to-file.sh
+./easy-save-all-vm-list-to-file.sh
+./easy-start-spec-vm-list.sh
+./easy-shutdown-all-online-vm.sh
+./easy-shutdown-spec-vm-list.sh
+./easy-rm-spec-vm-list.sh
 ```
 
 
