@@ -13,9 +13,8 @@ cd ${SH_PATH}
 
 # 引入env
 . ${SH_PATH}/kvm.env
-#VM_IMG_PATH=
-#VM_XML_PATH=
-#TEMPLATE_VM_NET_ON_KVM=
+#VM_DEFAULT_IMG_PATH=
+#KVM_XML_PATH=
 #QUIET=
 
 # 本地env
@@ -193,38 +192,60 @@ case "${ANSWER}" in
 y)
     while read LINE
     do
+        # 2
         VM_NAME=`echo $LINE | cut -f 2 -d '|'`
         VM_NAME=`echo $VM_NAME`
         VM_IMG="${VM_NAME}.img"
         VM_XML="${VM_NAME}.xml"
+        # 3
         VM_CPU=`echo $LINE | cut -f 3 -d '|'`
         VM_CPU=`echo $VM_CPU`
+        # 4
         VM_MEM=`echo $LINE | cut -f 4 -d '|'`
         VM_MEM=`echo $VM_MEM`
-        VM_NET=`echo $LINE | cut -f 5 -d '|'`
-        VM_NET=`echo $VM_NET`
+        # 5
+        VM_NIC=`echo $LINE | cut -f 5 -d '|'`
+        VM_NIC=`echo $VM_NIC`
+        # 6
         VM_IP=`echo $LINE | cut -f 6 -d '|'`
         VM_IP=`echo ${VM_IP}`
+        # 7
         VM_IP_MASK=`echo $LINE | cut -f 7 -d '|'`
         VM_IP_MASK=`echo ${VM_IP_MASK}`
-        VM_GATEWAY=`echo $LINE | cut -f 8 -d '|'`
-        VM_GATEWAY=`echo ${VM_GATEWAY}`
-        VM_DOMAIN=`echo $LINE | cut -f 9 -d '|'`
-        VM_DOMAIN=`echo ${VM_DOMAIN}`
-        VM_DNS=`echo $LINE | cut -f 10 -d '|'`
+        # 8
+        VM_IP_GATEWAY=`echo $LINE | cut -f 8 -d '|'`
+        VM_IP_GATEWAY=`echo ${VM_IP_GATEWAY}`
+        # 9
+        VM_DNS=`echo $LINE | cut -f 9 -d '|'`
         VM_DNS=`echo ${VM_DNS}`
+        if [[ -z ${VM_DNS} ]]; then
+            VM_DNS=${VM_DEFAULT_DNS}
+        fi
         VM_DNS1=`echo ${VM_DNS} | cut -d "," -f 1`
         VM_DNS1=`echo ${VM_DNS1}`
         VM_DNS2=`echo ${VM_DNS} | cut -d "," -f 2`
         VM_DNS2=`echo ${VM_DNS2}`
+        # 10
+        VM_DOMAIN=`echo $LINE | cut -f 10 -d '|'`
+        VM_DOMAIN=`echo ${VM_DOMAIN}`
+        if [[ -z ${VM_DOMAIN} ]]; then
+            VM_DOMAIN=${VM_DEFAULT_DOMAIN}
+        fi
+        # 11
+        VM_IMG_PATH=`echo $LINE | cut -f 11 -d '|'`
+        VM_IMG_PATH=`echo ${VM_IMG_PATH}`
+        if [[ -z ${VM_IMG_PATH} ]]; then
+            VM_IMG_PATH=${VM_DEFAULT_IMG_PATH}
+        fi
+        #
         echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
         echo "源模板： ${VM_TEMPLATE}"
         echo "新虚拟机名称：${VM_NAME}"
         echo "新虚拟机CPU(核)： ${VM_CPU}"
         echo "新虚拟机内存(GiB)：${VM_MEM}"
-        echo "新虚拟机网卡：${VM_NET}"
+        echo "新虚拟机网卡：${VM_NIC}"
         echo "新虚拟机IMG： ${VM_IMG_PATH}/${VM_IMG}"
-        echo "新虚拟机XML： ${VM_XML_PATH}/${VM_XML}"
+        echo "新虚拟机XML： ${KVM_XML_PATH}/${VM_XML}"
         echo "---------------------------------------------"
         # 是否已存在？
         if [ `F_VM_SEARCH  "${VM_NAME}" > /dev/null; echo $?` -eq 0 ]; then
@@ -237,18 +258,18 @@ y)
             echo "【${VM_NAME}】clone error, 请检查!"
             exit 1
         fi
-        sed -i  s/"<vcpu.*vcpu>"/"<vcpu placement='static'>${VM_CPU}<\/vcpu>"/g  "${VM_XML_PATH}/${VM_XML}"
-        sed -i  s/"<memory.*memory>"/"<memory unit='GiB'>${VM_MEM}<\/memory>"/g  "${VM_XML_PATH}/${VM_XML}"
-        sed -i  s/"<currentMemory.*currentMemory>"/"<currentMemory unit='GiB'>${VM_MEM}<\/currentMemory>"/g  "${VM_XML_PATH}/${VM_XML}"
-        sed -i  s/"${TEMPLATE_VM_NET_ON_KVM}"/"${VM_NET}"/g  "${VM_XML_PATH}/${VM_XML}"
+        sed -i  s/"<vcpu.*vcpu>"/"<vcpu placement='static'>${VM_CPU}<\/vcpu>"/g  "${KVM_XML_PATH}/${VM_XML}"
+        sed -i  s/"<memory.*memory>"/"<memory unit='GiB'>${VM_MEM}<\/memory>"/g  "${KVM_XML_PATH}/${VM_XML}"
+        sed -i  s/"<currentMemory.*currentMemory>"/"<currentMemory unit='GiB'>${VM_MEM}<\/currentMemory>"/g  "${KVM_XML_PATH}/${VM_XML}"
+        sed -i  s/"<source bridge=.*$"/"<source bridge='${VM_NIC}'\/>"/g  "${KVM_XML_PATH}/${VM_XML}"
         # On CentOS7.1 BUG修复，参考：https://bugs.centos.org/view.php?id=10402
-        #sed -i  s/'domain-m-centos-2c-4g'/"domain-${VM_NAME}"/  "${VM_XML_PATH}/${VM_XML}"
-        sed -i  s/"domain-${VM_TEMPLATE}"/"domain-${VM_NAME}"/  "${VM_XML_PATH}/${VM_XML}"
+        #sed -i  s/'domain-m-centos-2c-4g'/"domain-${VM_NAME}"/  "${KVM_XML_PATH}/${VM_XML}"
+        sed -i  s/"domain-${VM_TEMPLATE}"/"domain-${VM_NAME}"/  "${KVM_XML_PATH}/${VM_XML}"
         #重新define虚拟机
-        virsh define  "${VM_XML_PATH}/${VM_XML}"
+        virsh define  "${KVM_XML_PATH}/${VM_XML}"
         echo "---------------------------------------------"
         # 修改vm image
-        ./vm-img-modify.sh  --quiet  "${VM_NAME}"  "${VM_IP}"  "${VM_IP_MASK}"  "${VM_GATEWAY}"  "${VM_DOMAIN}"  "${VM_DNS1},${VM_DNS2}"
+        ./vm-img-modify.sh  --quiet  "${VM_NAME}"  "${VM_IP}"  "${VM_IP_MASK}"  "${VM_IP_GATEWAY}"  "${VM_DOMAIN}"  "${VM_DNS1},${VM_DNS2}"
     done < ${VM_LIST_TMP}
     ;;
 *)
