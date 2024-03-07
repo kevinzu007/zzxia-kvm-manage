@@ -14,8 +14,8 @@ cd ${SH_PATH}
 # 引入env
 . ${SH_PATH}/kvm.env
 #QUIET=
-#TEMPLATE_VM_LV=
-#TEMPLATE_VM_NET_1_FILE=
+#TEMPLATE_VM_ROOT_VOLUME=
+#TEMPLATE_VM_NET_CONF_FILE_CENTOS=
 
 
 
@@ -27,7 +27,7 @@ F_HELP()
     注意：本脚本在centos 7上测试通过
     用法：
         $0  [-h|--help]
-        $0  <-q|--quiet>  [ {VM_NAME}  {NEW_IP}  {NEW_IP_MASK}  {NEW_GATEWAY} ]  <{NEW_DOMAIN}>  <{NEW_DNS1}<,{NEW_DNS2}>>
+        $0  <-q|--quiet>  [ {VM_NAME}  {NEW_IP}  {NEW_IP_MASK}  {NEW_IP_GATEWAY} ]  <{NEW_DOMAIN}>  <{NEW_DNS1}<,{NEW_DNS2}>>
     参数说明：
         \$0   : 代表脚本本身
         []   : 代表是必选项
@@ -115,7 +115,7 @@ VM_NAME=${1}
 NEW_HOSTNAME=${VM_NAME}
 NEW_IP=${2}
 NEW_IP_MASK=${3}
-NEW_GATEWAY=${4}
+NEW_IP_GATEWAY=${4}
 NEW_DOMAIN=${5}
 NEW_FQDN="${NEW_HOSTNAME}.${NEW_DOMAIN}"
 NEW_DNS="${6}"
@@ -152,9 +152,9 @@ echo "待修改虚拟机名称：${VM_NAME}"
 echo "新FQDN名：${NEW_FQDN}"
 echo "新IP：${NEW_IP}"
 echo "新IP掩码：${NEW_IP_MASK}"
-echo "新网关：${NEW_GATEWAY}"
+echo "新网关：${NEW_IP_GATEWAY}"
 echo "新DNS：${NEW_DNS1} ${NEW_DNS2}"
-echo "挂载的逻辑卷：${TEMPLATE_VM_LV}"
+echo "挂载的逻辑卷：${TEMPLATE_VM_ROOT_VOLUME}"
 echo "挂载路径：${MOUNT_PATH}"
 echo "------------------------------------------------"
 
@@ -177,56 +177,56 @@ if [ ${GUESTFS_ERR} -ne 0 ]; then
     exit 1
 else
     #IMG_PATH='/var/lib/libvirt/images'
-    #guestmount -a "${IMG_PATH}/${VM_NAME}.img" -w -m ${TEMPLATE_VM_LV} ${MOUNT_PATH}
-    guestmount -d ${VM_NAME} -w -m ${TEMPLATE_VM_LV} ${MOUNT_PATH}
+    #guestmount -a "${IMG_PATH}/${VM_NAME}.img" -w -m ${TEMPLATE_VM_ROOT_VOLUME} ${MOUNT_PATH}
+    guestmount -d ${VM_NAME} -w -m ${TEMPLATE_VM_ROOT_VOLUME} ${MOUNT_PATH}
 fi
 
 
 echo "mount DIRECTORY list : ------------------------------------------------"
-ls ${MOUNT_PATH}
+ls -l ${MOUNT_PATH}
 
 echo "------------------------------------------------"
 # hostname
 sed -i  "s/.*/${NEW_FQDN}/"  "${MOUNT_PATH}/etc/hostname"
 # hosts
-sed -i  "/${NEW_FQDN}/d"  "${MOUNT_PATH}/etc/hosts"
-echo  "${NEW_IP} ${NEW_FQDN}" >> "${MOUNT_PATH}/etc/hosts"
+sed -i  "/${NEW_HOSTNAME}/d"  "${MOUNT_PATH}/etc/hosts"
+echo  "${NEW_IP}     ${NEW_FQDN}  ${NEW_HOSTNAME}" >> "${MOUNT_PATH}/etc/hosts"
 # machine-id
 cat /dev/null  > "${MOUNT_PATH}/etc/machine-id"
 # ssh_host_key
 rm -f  ${MOUNT_PATH}/etc/ssh/ssh_host_*
 # 关闭IPv6
-sed -i  's/IPV6INIT=.*/IPV6INIT="no"/'  "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}"
+sed -i  's/IPV6INIT=.*/IPV6INIT="no"/'  "${MOUNT_PATH}/${TEMPLATE_VM_NET_CONF_FILE_CENTOS}"
 
 # NET
-sed -i  '/^UUID.*/s/^/#/'  "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}"
-grep -q 'IPADDR='  "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}" \
-    && sed -i  "s/IPADDR=.*/IPADDR=${NEW_IP}/"  "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}" \
-    || echo "IPADDR=${NEW_IP}" >> "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}"
-grep -q '^PREFIX=' "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}" \
-    && sed -i  "s/^PREFIX=.*/PREFIX=${NEW_IP_MASK}/"  "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}" \
-    || echo "PREFIX=${NEW_IP_MASK}" >> "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}"
-grep -q 'GATEWAY=' "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}" \
-    && sed -i  "s/GATEWAY=.*/GATEWAY=${NEW_GATEWAY}/"  "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}" \
-    || echo "GATEWAY=${NEW_GATEWAY}" >> "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}"
+sed -i  '/^UUID.*/s/^/#/'  "${MOUNT_PATH}/${TEMPLATE_VM_NET_CONF_FILE_CENTOS}"
+grep -q 'IPADDR='  "${MOUNT_PATH}/${TEMPLATE_VM_NET_CONF_FILE_CENTOS}" \
+    && sed -i  "s/IPADDR=.*/IPADDR=${NEW_IP}/"  "${MOUNT_PATH}/${TEMPLATE_VM_NET_CONF_FILE_CENTOS}" \
+    || echo "IPADDR=${NEW_IP}" >> "${MOUNT_PATH}/${TEMPLATE_VM_NET_CONF_FILE_CENTOS}"
+grep -q '^PREFIX=' "${MOUNT_PATH}/${TEMPLATE_VM_NET_CONF_FILE_CENTOS}" \
+    && sed -i  "s/^PREFIX=.*/PREFIX=${NEW_IP_MASK}/"  "${MOUNT_PATH}/${TEMPLATE_VM_NET_CONF_FILE_CENTOS}" \
+    || echo "PREFIX=${NEW_IP_MASK}" >> "${MOUNT_PATH}/${TEMPLATE_VM_NET_CONF_FILE_CENTOS}"
+grep -q 'IP_GATEWAY=' "${MOUNT_PATH}/${TEMPLATE_VM_NET_CONF_FILE_CENTOS}" \
+    && sed -i  "s/IP_GATEWAY=.*/IP_GATEWAY=${NEW_IP_GATEWAY}/"  "${MOUNT_PATH}/${TEMPLATE_VM_NET_CONF_FILE_CENTOS}" \
+    || echo "IP_GATEWAY=${NEW_IP_GATEWAY}" >> "${MOUNT_PATH}/${TEMPLATE_VM_NET_CONF_FILE_CENTOS}"
 ## 可选
 # 域名
 if [ -n "${NEW_DOMAIN}" ]; then
-    grep -q 'DOMAIN=' "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}" \
-        && sed -i  "s/DOMAIN=.*/DOMAIN=${NEW_DOMAIN}/"  "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}" \
-        || echo "DOMAIN=${NEW_DOMAIN}" >> "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}"
+    grep -q 'DOMAIN=' "${MOUNT_PATH}/${TEMPLATE_VM_NET_CONF_FILE_CENTOS}" \
+        && sed -i  "s/DOMAIN=.*/DOMAIN=${NEW_DOMAIN}/"  "${MOUNT_PATH}/${TEMPLATE_VM_NET_CONF_FILE_CENTOS}" \
+        || echo "DOMAIN=${NEW_DOMAIN}" >> "${MOUNT_PATH}/${TEMPLATE_VM_NET_CONF_FILE_CENTOS}"
 fi
 # DNS1
 if [ -n "${NEW_DNS1}" ]; then
-    grep -q '^DNS1=' "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}" \
-        && sed -i  "s/^DNS1=.*/DNS1=${NEW_DNS1}/"  "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}" \
-        || echo "DNS1=${NEW_DNS1}" >> "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}"
+    grep -q '^DNS1=' "${MOUNT_PATH}/${TEMPLATE_VM_NET_CONF_FILE_CENTOS}" \
+        && sed -i  "s/^DNS1=.*/DNS1=${NEW_DNS1}/"  "${MOUNT_PATH}/${TEMPLATE_VM_NET_CONF_FILE_CENTOS}" \
+        || echo "DNS1=${NEW_DNS1}" >> "${MOUNT_PATH}/${TEMPLATE_VM_NET_CONF_FILE_CENTOS}"
 fi
 # DNS2
 if [ -n "${NEW_DNS2}" ]; then
-    grep -q '^DNS2=' "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}" \
-        && sed -i  "s/^DNS2=.*/DNS2=${NEW_DNS2}/"  "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}" \
-        || echo "DNS2=${NEW_DNS2}" >> "${MOUNT_PATH}/${TEMPLATE_VM_NET_1_FILE}"
+    grep -q '^DNS2=' "${MOUNT_PATH}/${TEMPLATE_VM_NET_CONF_FILE_CENTOS}" \
+        && sed -i  "s/^DNS2=.*/DNS2=${NEW_DNS2}/"  "${MOUNT_PATH}/${TEMPLATE_VM_NET_CONF_FILE_CENTOS}" \
+        || echo "DNS2=${NEW_DNS2}" >> "${MOUNT_PATH}/${TEMPLATE_VM_NET_CONF_FILE_CENTOS}"
 fi
 
 SED_ERR=$?
