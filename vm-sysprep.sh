@@ -299,8 +299,8 @@ do
         #
         if [[ ${VM_NAME_A} == ${VM_NAME} ]]; then
             # 6
-            VM_P_HOST=`echo $LINE_A | cut -f 6 -d '|'`
-            VM_P_HOST=`echo ${VM_P_HOST}`
+            KVM_HOST=`echo $LINE_A | cut -f 6 -d '|'`
+            KVM_HOST=`echo ${KVM_HOST}`
             #
             GET_IT_A='YES'
             break     #-- 匹配1次
@@ -315,14 +315,14 @@ do
     #
     echo "--------------------------------------------------"     #--- 50 (60-50-40)   == --
     echo "虚拟机：${VM_NAME}"
-    echo "宿主机：${VM_P_HOST}"
+    echo "宿主机：${KVM_HOST}"
     echo "虚拟机IP：  ${VM_IP}/${VM_IP_MASK}"
     echo "虚拟机网关：${VM_IP_GATEWAY}"
     echo "虚拟机DNS： ${VM_DNS}"
     echo "虚拟机FQDN：${VM_NAME}.${VM_DOMAIN}"
     echo
     #
-    KVM_LIBVIRT_URL="qemu+ssh://${KVM_SSH_USER}@${VM_P_HOST}:${KVM_SSH_PORT}/system"
+    KVM_LIBVIRT_URL="qemu+ssh://${KVM_SSH_USER}@${KVM_HOST}:${KVM_SSH_PORT}/system"
     #
     > ${VM_LIST_EXISTED}
     virsh  --connect ${KVM_LIBVIRT_URL}  list --all  > ${VM_LIST_EXISTED}
@@ -348,7 +348,7 @@ do
     #
     # 获取版本信息
     VM_OS_RELEASE_FILE="${LOG_HOME}/os-release"
-    ssh  -p ${KVM_SSH_PORT}  ${KVM_SSH_USER}@${VM_P_HOST}  "virt-cat  -d ${VM_NAME}  /etc/os-release"  > ${VM_OS_RELEASE_FILE}
+    ssh  -p ${KVM_SSH_PORT}  ${KVM_SSH_USER}@${KVM_HOST}  "virt-cat  -d ${VM_NAME}  /etc/os-release"  > ${VM_OS_RELEASE_FILE}
     VM_OS=$(cat ${VM_OS_RELEASE_FILE}  |  grep -E ^ID=  |  cut -d '"' -f 2)
     #VM_OS_VERSION=$(cat ${VM_OS_RELEASE_FILE}  |  grep -E ^VERSION_ID=  |  cut -d '"' -f 2)
     #
@@ -359,7 +359,7 @@ do
     VM_HOSTS_FILENAME="hosts"
     #
     F_GEN_HOSTS     > ${VM_CONF_SRC_DIR}/${VM_HOSTS_FILENAME}
-    scp  -P ${VM_P_HOST}  ${VM_CONF_SRC_DIR}/${VM_HOSTS_FILENAME}     ${KVM_SSH_USER}@${VM_P_HOST}:${VM_CONF_SRC_DIR}/
+    scp  -P ${KVM_HOST}  ${VM_CONF_SRC_DIR}/${VM_HOSTS_FILENAME}     ${KVM_SSH_USER}@${KVM_HOST}:${VM_CONF_SRC_DIR}/
     #
     # nic
     case ${VM_OS} in
@@ -390,12 +390,12 @@ do
     esac
     #
     F_GEN_NIC_CONF  > ${VM_CONF_SRC_DIR}/${VM_NIC_CONF_FILENAME}
-    scp  -P ${VM_P_HOST}  ${VM_CONF_SRC_DIR}/${VM_NIC_CONF_FILENAME}  ${KVM_SSH_USER}@${VM_P_HOST}:${VM_CONF_SRC_DIR}/
+    scp  -P ${KVM_HOST}  ${VM_CONF_SRC_DIR}/${VM_NIC_CONF_FILENAME}  ${KVM_SSH_USER}@${KVM_HOST}:${VM_CONF_SRC_DIR}/
     #
     VM_SYSPREP_LOG_FILE="${LOG_HOME}/${SH_NAME}-sysprep.log--${VM_NAME}"
     > ${VM_SYSPREP_LOG_FILE}
     #
-    ssh  -p ${KVM_SSH_PORT}  ${KVM_SSH_USER}@${VM_P_HOST}  "virt-sysprep  \
+    ssh  -p ${KVM_SSH_PORT}  ${KVM_SSH_USER}@${KVM_HOST}  "virt-sysprep  \
         --copy-in ${VM_CONF_SRC_DIR}/${VM_HOSTS_FILENAME}:${VM_HOSTS_DEST_DIR}/  \
         --copy-in ${VM_CONF_SRC_DIR}/${VM_NIC_CONF_FILENAME}:${VM_NIC_CONF_DEST_DIR}/  \
         --hostname ${VM_NAME}.${VM_DOMAIN}  \

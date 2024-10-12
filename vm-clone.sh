@@ -155,7 +155,7 @@ if [[ $# -eq 0 ]]; then
     cp  ${VM_LIST}  ${VM_LIST_TMP}
     sed -i -e '/^#/d' -e '/^$/d' -e '/^[ ]*$/d' ${VM_LIST_TMP}
 else
-    for i in $@
+    for i in "$@"
     do
         #
         GET_IT='N'
@@ -217,8 +217,8 @@ do
     VM_NIC=`echo $LINE | cut -f 5 -d '|'`
     VM_NIC=`echo $VM_NIC`
     # 6
-    VM_P_HOST=`echo $LINE | cut -f 6 -d '|'`
-    VM_P_HOST=`echo ${VM_P_HOST}`
+    KVM_HOST=`echo $LINE | cut -f 6 -d '|'`
+    KVM_HOST=`echo ${KVM_HOST}`
     # 7
     VM_CLONE_TEMPLATE=`echo $LINE | cut -f 7 -d '|'`
     VM_CLONE_TEMPLATE=`echo ${VM_CLONE_TEMPLATE}`
@@ -232,14 +232,14 @@ do
     VM_NOTE=`echo ${VM_NOTE}`
     #
     echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"    #-- 70 ( 80##  70++  60## )
-    echo "宿主机： ${VM_P_HOST}"
+    echo "宿主机： ${KVM_HOST}"
     echo "克隆模板： ${VM_CLONE_TEMPLATE}"
     echo "新虚拟机名称：${VM_NAME}"
     echo "新虚拟机CPU(核)： ${VM_CPU}"
     echo "新虚拟机内存(GiB)：${VM_MEM}"
     echo "新虚拟机网卡：${VM_NIC}"
     echo 
-    KVM_LIBVIRT_URL="qemu+ssh://${KVM_SSH_USER}@${VM_P_HOST}:${KVM_SSH_PORT}/system"
+    KVM_LIBVIRT_URL="qemu+ssh://${KVM_SSH_USER}@${KVM_HOST}:${KVM_SSH_PORT}/system"
     #
     > ${VM_LIST_EXISTED}
     virsh  --connect ${KVM_LIBVIRT_URL}  list --all  > ${VM_LIST_EXISTED}
@@ -287,10 +287,10 @@ do
     #
     F_GEN_SED_SH="/tmp/${SH_NAME}-xml-sed.sh"
     F_GEN_SED > ${F_GEN_SED_SH}
-    scp  -P ${VM_P_HOST}  ${F_GEN_SED_SH}  ${KVM_SSH_USER}@${VM_P_HOST}:${F_GEN_SED_SH}
+    scp  -P ${KVM_HOST}  ${F_GEN_SED_SH}  ${KVM_SSH_USER}@${KVM_HOST}:${F_GEN_SED_SH}
     #
     #重新define虚拟机
-    ssh  -p ${KVM_SSH_PORT}  ${KVM_SSH_USER}@${VM_P_HOST}  "bash ${F_GEN_SED_SH}  &&  virsh define ${KVM_XML_PATH}/${VM_XML}"
+    ssh  -p ${KVM_SSH_PORT}  ${KVM_SSH_USER}@${KVM_HOST}  "bash ${F_GEN_SED_SH}  &&  virsh define ${KVM_XML_PATH}/${VM_XML}"
     #
     # vm sysprep
     bash  ${VM_SYSPREP_SH}  --quiet  "${VM_NAME}"
