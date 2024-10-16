@@ -9,10 +9,11 @@
 # sh
 SH_NAME=${0##*/}
 SH_PATH=$( cd "$( dirname "$0" )" && pwd )
-cd ${SH_PATH}
+cd "${SH_PATH}" || exit 1
 
 # 引入env
-. ${SH_PATH}/kvm.env
+# shellcheck source=/home/kevin/git-projects/zzxia-kvm-manage/kvm.env.sample
+. "${SH_PATH}/kvm.env"
 #LOG_HOME=
 #VM_DEFAULT_DNS=
 #VM_DEFAULT_DOMAIN=
@@ -70,15 +71,15 @@ F_SEARCH_EXISTED_VM ()
 {
     FS_VM_NAME=$1
     GET_IT='NO'
-    while read LINE
+    while read -r LINE
     do
-        F_VM_NAME=`echo "$LINE" | awk '{print $2}'`
-        F_VM_STATUS=`echo "$LINE" | awk '{print $3}'`
+        F_VM_NAME=$(echo "$LINE" | awk '{print $2}')
+        F_VM_STATUS=$(echo "$LINE" | awk '{print $3}')
         if [ "x${FS_VM_NAME}" = "x${F_VM_NAME}" ]; then
             GET_IT='YES'
             break
         fi
-    done < ${VM_LIST_EXISTED}
+    done < "${VM_LIST_EXISTED}"
     #
     if [ "${GET_IT}" = 'YES' ]; then
         echo -e "${F_VM_STATUS}"
@@ -170,10 +171,31 @@ EOF
 }
 
 
+# 生成cloud-localds网卡配置
+# 用法：F_GEN_CLOUD_LOCALDS_CONF
+F_GEN_CLOUD_LOCALDS_CONF ()
+{
+    cat << EOF
+network:
+  version: 2
+  ethernets:
+    eth0:
+      dhcp4: no
+      addresses:
+        - ${VM_IP}/${VM_IP_MASK}
+      gateway4: ${VM_IP_GATEWAY}
+      nameservers:
+        addresses:
+          - ${VM_DNS1}
+          - ${VM_DNS2}
+EOF
+}
+
+
 
 # 参数检查
-TEMP=`getopt -o hq  -l help,quiet -- "$@"`
-if [ $? != 0 ]; then
+TEMP=$(getopt -o hq  -l help,quiet -- "$@")
+if [ $? -ne 0 ]; then
     echo -e "\n峰哥说：参数不合法，请查看帮助【$0 --help】\n"
     exit 1
 fi
@@ -209,29 +231,29 @@ done
 
 
 # 待搜索的服务清单
-> ${VM_LIST_APPEND_1_TMP}
+true > "${VM_LIST_APPEND_1_TMP}"
 # 参数个数为
 if [[ $# -eq 0 ]]; then
-    cp  ${VM_LIST_APPEND_1}  ${VM_LIST_APPEND_1_TMP}
-    sed -i -e '/^#/d' -e '/^$/d' -e '/^[ ]*$/d' ${VM_LIST_APPEND_1_TMP}
+    cp  "${VM_LIST_APPEND_1}"  "${VM_LIST_APPEND_1_TMP}"
+    sed -i -e '/^#/d' -e '/^$/d' -e '/^[ ]*$/d' "${VM_LIST_APPEND_1_TMP}"
 else
-    for i in $@
+    for i in "$@"
     do
         #
         GET_IT='N'
-        while read LINE
+        while read -r LINE
         do
             # 跳过以#开头的行或空行
-            [[ "$LINE" =~ ^# ]] || [[ "$LINE" =~ ^[\ ]*$ ]] && continue
+            [[ $LINE =~ ^# ]] || [[ $LINE =~ ^[\ ]*$ ]] && continue
             #
-            VM_NAME=`echo $LINE | awk -F '|' '{print $2}'`
-            VM_NAME=`echo ${VM_NAME}`
+            VM_NAME=$(echo "$LINE" | awk -F '|' '{print $2}')
+            VM_NAME=$(echo "${VM_NAME}")
             if [[ ${VM_NAME} =~ ^$i$ ]]; then
-                echo $LINE >> ${VM_LIST_APPEND_1_TMP}
+                echo "$LINE" >> "${VM_LIST_APPEND_1_TMP}"
                 GET_IT='YES'
                 #break    #-- 匹配1次
             fi
-        done < ${VM_LIST_APPEND_1}
+        done < "${VM_LIST_APPEND_1}"
         #
         if [[ $GET_IT != 'YES' ]]; then
             echo -e "\n猪猪侠警告：虚拟机【${i}】不在列表【${VM_LIST}】中，请检查！\n"
@@ -240,17 +262,17 @@ else
     done
 fi
 # 加表头
-sed -i  "1i#| **名称** | **IP地址** | IP掩码  | **IP网关** | **DNS** | **域名** |"  ${VM_LIST_APPEND_1_TMP}
+sed -i  "1i#| **名称** | **IP地址** | IP掩码  | **IP网关** | **DNS** | **域名** |"  "${VM_LIST_APPEND_1_TMP}"
 # 屏显
 echo -e "${ECHO_NORMAL}=======================开始 Sysprep =======================${ECHO_CLOSE}"    #-- 60 ( 60==  50--  40== )
 echo -e "\n【${SH_NAME}】待Sysprep虚拟机清单："
-${FORMAT_TABLE_SH}  --delimeter '|'  --file ${VM_LIST_APPEND_1_TMP}
+${FORMAT_TABLE_SH}  --delimeter '|'  --file "${VM_LIST_APPEND_1_TMP}"
 
 
 # 交互
 if [[ ${QUIET} == NO ]]; then
     echo "以上信息正确吗？如果正确，请输入 "'y'""
-    read -p "请输入："  ANSWER
+    read -r -p "请输入："  ANSWER
     #
     if [[ ! ${ANSWER} == y ]]; then
         echo "小子，好好检查吧！"
@@ -261,7 +283,7 @@ fi
 
 
 # go
-while read LINE
+while read -r LINE
 do
     # 2
     VM_NAME=`echo $LINE | cut -f 2 -d '|'`
@@ -297,7 +319,7 @@ do
         VM_NAME_A=`echo ${LINE_A} | cut -d \| -f 2`
         VM_NAME_A=`echo ${VM_NAME_A}`
         #
-        if [[ ${VM_NAME_A} == ${VM_NAME} ]]; then
+        if [[ "${VM_NAME_A}" == "${VM_NAME}" ]]; then
             # 6
             KVM_HOST=`echo $LINE_A | cut -f 6 -d '|'`
             KVM_HOST=`echo ${KVM_HOST}`
@@ -305,7 +327,7 @@ do
             GET_IT_A='YES'
             break     #-- 匹配1次
         fi
-    done < ${VM_LIST_TMP}
+    done < "${VM_LIST_TMP}"
     #
     if [[ ${GET_IT_A} != 'YES' ]];then
         echo -e "\n猪猪侠警告：在【${VM_LIST}】文件中没有找到虚拟机【${VM_NAME}】，请检查！\n"
@@ -324,14 +346,14 @@ do
     #
     KVM_LIBVIRT_URL="qemu+ssh://${KVM_SSH_USER}@${KVM_HOST}:${KVM_SSH_PORT}/system"
     #
-    > ${VM_LIST_EXISTED}
-    virsh  --connect ${KVM_LIBVIRT_URL}  list --all  > ${VM_LIST_EXISTED}
+    true> "${VM_LIST_EXISTED}"
+    virsh  --connect "${KVM_LIBVIRT_URL}"  list --all  > "${VM_LIST_EXISTED}"
     if [[ $? -ne 0 ]]; then
         echo -e "\n峰哥说：连接KVM宿主机失败，退出！\n"
         exit 1
     fi
     # 删除无用行
-    sed -i '1,2d;s/[ ]*//;/^$/d'  ${VM_LIST_EXISTED}
+    sed -i '1,2d;s/[ ]*//;/^$/d'  "${VM_LIST_EXISTED}"
     #
     # 是否存在
     #
@@ -344,68 +366,59 @@ do
         exit 1
     fi
     #
-    # sysprep
+    # virt-sysprep
     #
-    # 获取版本信息
-    VM_OS_RELEASE_FILE="${LOG_HOME}/os-release"
-    ssh  -p ${KVM_SSH_PORT}  ${KVM_SSH_USER}@${KVM_HOST}  "virt-cat  -d ${VM_NAME}  /etc/os-release"  > ${VM_OS_RELEASE_FILE}
-    VM_OS=$(cat ${VM_OS_RELEASE_FILE}  |  grep -E ^ID=  |  cut -d '"' -f 2)
+    VM_CONF_DIR="/tmp"
+    #
+    ## 获取虚拟机OS版本信息
+    #VM_OS_RELEASE_FILE="${LOG_HOME}/os-release"
+    #ssh  -p ${KVM_SSH_PORT}  ${KVM_SSH_USER}@${KVM_HOST}  "virt-cat  -d ${VM_NAME}  /etc/os-release"  > ${VM_OS_RELEASE_FILE}
+    #VM_OS=$(cat ${VM_OS_RELEASE_FILE}  |  grep -E ^ID=  |  cut -d '"' -f 2)
     #VM_OS_VERSION=$(cat ${VM_OS_RELEASE_FILE}  |  grep -E ^VERSION_ID=  |  cut -d '"' -f 2)
-    #
-    VM_CONF_SRC_DIR="/tmp"
+    #VM_OS_PRETTY_NAME=$(cat ${VM_OS_RELEASE_FILE}  |  grep -E ^PRETTY_NAME=  |  cut -d '"' -f 2)
     #
     # hosts
-    VM_HOSTS_DEST_DIR="/etc"
-    VM_HOSTS_FILENAME="hosts"
     #
-    F_GEN_HOSTS     > ${VM_CONF_SRC_DIR}/${VM_HOSTS_FILENAME}
-    scp  -P ${KVM_HOST}  ${VM_CONF_SRC_DIR}/${VM_HOSTS_FILENAME}     ${KVM_SSH_USER}@${KVM_HOST}:${VM_CONF_SRC_DIR}/
+    VM_HOSTS_FILE="${VM_CONF_DIR}hosts--${VM_NAME}"
+    F_GEN_HOSTS     > "${VM_HOSTS_FILE}"
+    scp  -P ${KVM_SSH_PORT}  "${VM_HOSTS_FILE}"  ${KVM_SSH_USER}@"${KVM_HOST}":/tmp/hosts
     #
-    # nic
-    case ${VM_OS} in
-        centos)
-            #
-            VM_NIC_CONF_DEST_DIR="/etc/sysconfig/network-scripts"
-            VM_NIC_CONF_FILENAME="ifcfg-eth0"
-            ;;
-        ubuntu)
-            case ${VM_OS_VERSION} in
-                1*)
-                    VM_NIC_CONF_DEST_DIR="/etc/network"
-                    VM_NIC_CONF_FILENAME="interface"
-                    ;;
-                2*)
-                    VM_NIC_CONF_DEST_DIR="/etc/netplan"
-                    VM_NIC_CONF_FILENAME="00-installer-config.yaml"
-                    ;;
-                *)
-                    VM_NIC_CONF_DEST_DIR="/etc/netplan"
-                    VM_NIC_CONF_FILENAME="00-installer-config.yaml"
-                    ;;
-            esac
-            ;;
-        *)
-            echo 这是啥，没搞${VM_OS}
-            ;;
-    esac
-    #
-    F_GEN_NIC_CONF  > ${VM_CONF_SRC_DIR}/${VM_NIC_CONF_FILENAME}
-    scp  -P ${KVM_HOST}  ${VM_CONF_SRC_DIR}/${VM_NIC_CONF_FILENAME}  ${KVM_SSH_USER}@${KVM_HOST}:${VM_CONF_SRC_DIR}/
     #
     VM_SYSPREP_LOG_FILE="${LOG_HOME}/${SH_NAME}-sysprep.log--${VM_NAME}"
-    > ${VM_SYSPREP_LOG_FILE}
+    true> "${VM_SYSPREP_LOG_FILE}"
     #
-    ssh  -p ${KVM_SSH_PORT}  ${KVM_SSH_USER}@${KVM_HOST}  "virt-sysprep  \
-        --copy-in ${VM_CONF_SRC_DIR}/${VM_HOSTS_FILENAME}:${VM_HOSTS_DEST_DIR}/  \
-        --copy-in ${VM_CONF_SRC_DIR}/${VM_NIC_CONF_FILENAME}:${VM_NIC_CONF_DEST_DIR}/  \
+    #ssh  -p ${KVM_SSH_PORT}  ${KVM_SSH_USER}@${KVM_HOST}  "virt-sysprep  \
+    #    --copy-in ${VM_CONF_DIR}/${VM_HOSTS_FILENAME}:${VM_HOSTS_DEST_DIR}/  \
+    #    --copy-in ${VM_CONF_DIR}/${VM_NIC_CONF_FILENAME}:${VM_NIC_CONF_DEST_DIR}/  \
+    #    --hostname ${VM_NAME}.${VM_DOMAIN}  \
+    #    -d ${VM_NAME}"  | tee ${VM_SYSPREP_LOG_FILE} 2>&1
+    ssh  -p "${KVM_SSH_PORT}"  "${KVM_SSH_USER}@${KVM_HOST}" < /dev/null  "virt-sysprep  \
+        --copy-in /tmp/hosts:/etc/hosts  \
         --hostname ${VM_NAME}.${VM_DOMAIN}  \
-        -d ${VM_NAME}"  | tee ${VM_SYSPREP_LOG_FILE} 2>&1
+        -d ${VM_NAME}"  | tee "${VM_SYSPREP_LOG_FILE}" 2>&1
     #
-    if [ `grep -q 'ERROR' ${VM_SYSPREP_LOG_FILE}; echo $?` -eq 0 ]; then
-        echo "【${VM_NAME}】sysprep，请检查！"
+    if [ "$(grep -q -i 'ERROR' "${VM_SYSPREP_LOG_FILE}"; echo $?)" -eq 0 ]; then
+        echo "【${VM_NAME}】virt-sysprep出错，请检查！"
         exit 1
     fi
     #
-done < ${VM_LIST_APPEND_1_TMP}
+    # cloud-init
+    #
+    VM_CLOUD_INIT_LOG_FILE="${LOG_HOME}/${SH_NAME}-cloud-init.log--${VM_NAME}"
+    true> "${VM_CLOUD_INIT_LOG_FILE}"
+    #
+    VM_CLOUD_LOCALDS_CONF_FILE="${VM_CONF_DIR}/cloud_localds_conf.yaml--${VM_NAME}"
+    F_GEN_CLOUD_LOCALDS_CONF  > "${VM_CLOUD_LOCALDS_CONF_FILE}"
+    scp  -P ${KVM_SSH_PORT}  "${VM_CLOUD_LOCALDS_CONF_FILE}"    ${KVM_SSH_USER}@"${KVM_HOST}":/tmp/cloud_localds_conf.yaml
+    #
+    ssh  -p "${KVM_SSH_PORT}"  "${KVM_SSH_USER}@${KVM_HOST}" < /dev/null  "cloud-localds  /tmp/seed.iso  /tmp/cloud_localds_conf.yaml  \
+        &&  virsh attach-disk  ${VM_NAME}  --source /tmp/seed.iso  --target hdb  --type cdrom"   | tee "${VM_CLOUD_INIT_LOG_FILE}" 2>&1
+    #
+    if [ "$(grep -q -i 'ERROR' "${VM_CLOUD_INIT_LOG_FILE}"; echo $?)" -eq 0 ]; then
+        echo "【${VM_NAME}】cloud-init出错，请检查！"
+        exit 1
+    fi
+    #
+done < "${VM_LIST_APPEND_1_TMP}"
 
 
