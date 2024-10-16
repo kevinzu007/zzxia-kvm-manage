@@ -202,6 +202,8 @@ fi
 # go
 while read LINE
 do
+    # 跳过以#开头的行或空行
+    [[ "$LINE" =~ ^# ]] || [[ "$LINE" =~ ^[\ ]*$ ]] && continue
     # 2
     VM_NAME=`echo $LINE | cut -f 2 -d '|'`
     VM_NAME=`echo $VM_NAME`
@@ -241,7 +243,7 @@ do
     echo 
     KVM_LIBVIRT_URL="qemu+ssh://${KVM_SSH_USER}@${KVM_HOST}:${KVM_SSH_PORT}/system"
     #
-    > ${VM_LIST_EXISTED}
+    true> ${VM_LIST_EXISTED}
     virsh  --connect ${KVM_LIBVIRT_URL}  list --all  > ${VM_LIST_EXISTED}
     if [[ $? -ne 0 ]]; then
         echo -e "\n峰哥说：连接KVM宿主机失败，退出！\n"
@@ -272,13 +274,15 @@ do
     # clone
     #
     VM_CLONE_LOG_FILE="${LOG_HOME}/${SH_NAME}-clone.log--${VM_NAME}"
-    > ${VM_CLONE_LOG_FILE}
+    true> ${VM_CLONE_LOG_FILE}
     virt-clone  --connect ${KVM_LIBVIRT_URL}  \
         -o ${VM_CLONE_TEMPLATE}  \
         -n ${VM_NAME}  \
         -f ${VM_DISK_IMG_PATH}/${VM_IMG}  | tee ${VM_CLONE_LOG_FILE} 2>&1
     #
-    if [ `grep -i -q 'ERROR' ${VM_CLONE_LOG_FILE}; echo $?` -eq 0 ]; then
+    #if [ "$(grep -i -q 'ERROR' "${VM_CLONE_LOG_FILE}"; echo $?)" -eq 0 ]; then
+    #if [ "$(grep -i -q 'ERROR' "${VM_CLONE_LOG_FILE}"; echo $?)" ]; then
+    if grep -i -q 'ERROR' "${VM_CLONE_LOG_FILE}"; then
         echo "【${VM_NAME}】clone 出错，请检查！"
         exit 1
     fi
@@ -290,7 +294,7 @@ do
     scp  -P ${KVM_HOST}  ${F_GEN_SED_SH}  ${KVM_SSH_USER}@${KVM_HOST}:${F_GEN_SED_SH}
     #
     #重新define虚拟机
-    ssh  -p ${KVM_SSH_PORT}  ${KVM_SSH_USER}@${KVM_HOST}  "bash ${F_GEN_SED_SH}  &&  virsh define ${KVM_XML_PATH}/${VM_XML}"
+    ssh  -p ${KVM_SSH_PORT}  ${KVM_SSH_USER}@${KVM_HOST}  < /dev/null  "bash ${F_GEN_SED_SH}  &&  virsh define ${KVM_XML_PATH}/${VM_XML}"
     #
     # vm sysprep
     bash  ${VM_SYSPREP_SH}  --quiet  "${VM_NAME}"
