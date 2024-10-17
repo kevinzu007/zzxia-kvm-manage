@@ -9,14 +9,18 @@
 # sh
 SH_NAME=${0##*/}
 SH_PATH=$( cd "$( dirname "$0" )" && pwd )
-cd ${SH_PATH}
+cd "${SH_PATH}" || exit 1
 
 # 引入env
-. ${SH_PATH}/kvm.env
+# shellcheck source=/home/kevin/git-projects/zzxia-kvm-manage/kvm.env.sample
+. "${SH_PATH}/kvm.env"
 #LOG_HOME=
+#KVM_DEFAULT_SSH_HOST=
+#KVM_DEFAULT_SSH_PORT=
+#KVM_DEFAULT_SSH_USER=
+#KVM_DEFAULT_XML_PATH=
 #VM_DEFAULT_CLONE_TEMPLATE=
 #VM_DEFAULT_DISK_IMG_PATH=
-#KVM_XML_PATH=
 
 # 本地env
 QUIET='NO'     #-- 静默方式
@@ -73,15 +77,15 @@ F_SEARCH_EXISTED_VM ()
 {
     FS_VM_NAME=$1
     GET_IT='NO'
-    while read LINE
+    while read -r LINE
     do
-        F_VM_NAME=`echo "$LINE" | awk '{print $2}'`
-        F_VM_STATUS=`echo "$LINE" | awk '{print $3}'`
+        F_VM_NAME=$(echo "$LINE" | awk '{print $2}')
+        F_VM_STATUS=$(echo "$LINE" | awk '{print $3}')
         if [ "x${FS_VM_NAME}" = "x${F_VM_NAME}" ]; then
             GET_IT='YES'
             break
         fi
-    done < ${VM_LIST_EXISTED}
+    done < "${VM_LIST_EXISTED}"
     #
     if [ "${GET_IT}" = 'YES' ]; then
         echo -e "${F_VM_STATUS}"
@@ -112,7 +116,7 @@ EOF
 
 
 # 参数检查
-TEMP=`getopt -o hq  -l help,quiet -- "$@"`
+TEMP=$(getopt -o hq  -l help,quiet -- "$@")
 if [ $? != 0 ]; then
     echo -e "\n峰哥说：参数不合法，请查看帮助【$0 --help】\n"
     exit 1
@@ -150,29 +154,28 @@ done
 
 
 # 待搜索的服务清单
-> ${VM_LIST_TMP}
+true> "${VM_LIST_TMP}"
 # 参数个数为
 if [[ $# -eq 0 ]]; then
-    cp  ${VM_LIST}  ${VM_LIST_TMP}
-    sed -i -e '/^#/d' -e '/^$/d' -e '/^[ ]*$/d' ${VM_LIST_TMP}
+    cp  "${VM_LIST}"  "${VM_LIST_TMP}"
+    sed -i -e '/^#/d' -e '/^$/d' -e '/^[ ]*$/d' "${VM_LIST_TMP}"
 else
     for i in "$@"
     do
         #
         GET_IT='N'
-        while read LINE
+        while read -r LINE
         do
             # 跳过以#开头的行或空行
             [[ "$LINE" =~ ^# ]] || [[ "$LINE" =~ ^[\ ]*$ ]] && continue
             #
-            VM_NAME=`echo $LINE | awk -F '|' '{print $2}'`
-            VM_NAME=`echo ${VM_NAME}`
+            VM_NAME=$(echo "$LINE" | awk -F '|' '{print $2}' | xargs)
             if [[ ${VM_NAME} =~ ^$i$ ]]; then
-                echo $LINE >> ${VM_LIST_TMP}
+                echo "$LINE" >> "${VM_LIST_TMP}"
                 GET_IT='YES'
                 #break    #-- 匹配1次
             fi
-        done < ${VM_LIST}
+        done < "${VM_LIST}"
         #
         if [[ $GET_IT != 'YES' ]]; then
             echo -e "\n猪猪侠警告：虚拟机【${i}】不在列表【${VM_LIST}】中，请检查！\n"
@@ -181,17 +184,17 @@ else
     done
 fi
 # 加表头
-sed -i  "1i#| **名称** | CPU  | 内存 | 网卡 |  **物理宿主机** | **克隆模板** | **磁盘IMG路径** | **备注** |"  ${VM_LIST_TMP}
+sed -i  "1i#| **名称** | CPU  | 内存 | 网卡 |  **物理宿主机** | **克隆模板** | **磁盘IMG路径** | **备注** |"  "${VM_LIST_TMP}"
 # 屏显
 echo -e "${ECHO_NORMAL}############################# 开始 Clone #############################${ECHO_CLOSE}"   #-- 80 ( 80##  70++  60## )
 echo -e "\n【${SH_NAME}】待Clone虚拟机清单："
-${FORMAT_TABLE_SH}  --delimeter '|'  --file ${VM_LIST_TMP}
+${FORMAT_TABLE_SH}  --delimeter '|'  --file "${VM_LIST_TMP}"
 
 
 # 交互
 if [[ ${QUIET} == NO ]]; then
     echo "以上信息正确吗？如果正确，请输入 "'y'""
-    read -p "请输入："  ANSWER
+    read -r -p "请输入："  ANSWER
     #
     if [[ ! ${ANSWER} == y ]]; then
         echo "小子，好好检查吧！"
@@ -201,58 +204,73 @@ fi
 
 
 # go
-while read LINE
+while read -r LINE
 do
     # 跳过以#开头的行或空行
     [[ "$LINE" =~ ^# ]] || [[ "$LINE" =~ ^[\ ]*$ ]] && continue
     # 2
-    VM_NAME=`echo $LINE | cut -f 2 -d '|'`
-    VM_NAME=`echo $VM_NAME`
+    VM_NAME=$(echo "$LINE" | cut -f 2 -d '|' | xargs)
     VM_IMG="${VM_NAME}.img"
     VM_XML="${VM_NAME}.xml"
     # 3
-    VM_CPU=`echo $LINE | cut -f 3 -d '|'`
-    VM_CPU=`echo $VM_CPU`
+    VM_CPU=$(echo "$LINE" | cut -f 3 -d '|' | xargs)
     # 4
-    VM_MEM=`echo $LINE | cut -f 4 -d '|'`
-    VM_MEM=`echo $VM_MEM`
+    VM_MEM=$(echo "$LINE" | cut -f 4 -d '|' | xargs)
     # 5
-    VM_NIC=`echo $LINE | cut -f 5 -d '|'`
-    VM_NIC=`echo $VM_NIC`
+    VM_NIC=$(echo "$LINE" | cut -f 5 -d '|' | xargs)
     # 6
-    KVM_HOST=`echo $LINE | cut -f 6 -d '|'`
-    KVM_HOST=`echo ${KVM_HOST}`
+    KVM_HOST=$(echo "$LINE" | cut -f 6 -d '|' | xargs)
+    #KVM_HOST=${KVM_HOST// /}
+    # 初始化变量
+    KVM_SSH_USER=""
+    KVM_SSH_HOST=""
+    KVM_SSH_PORT=""
+    # 使用模式匹配提取用户、主机和端口
+    if [[ -n "$KVM_HOST" ]]; then
+        if [[ $KVM_HOST =~ ^([^@]+)@([^:]+)(:([0-9]+))?$ ]]; then
+            KVM_SSH_USER="${BASH_REMATCH[1]}"  # 提取用户
+            KVM_SSH_HOST="${BASH_REMATCH[2]}"  # 提取主机
+            KVM_SSH_PORT="${BASH_REMATCH[4]}"  # 提取端口
+        elif [[ $KVM_HOST =~ ^([^:]+)(:([0-9]+))?$ ]]; then
+            KVM_SSH_HOST="${BASH_REMATCH[1]}"  # 提取主机
+            KVM_SSH_PORT="${BASH_REMATCH[3]}"  # 提取端口
+        fi
+    fi
+    # 如果某个值为空，使用默认值
+    KVM_SSH_USER="${KVM_SSH_USER:-$KVM_DEFAULT_SSH_USER}"
+    KVM_SSH_HOST="${KVM_SSH_HOST:-$KVM_DEFAULT_SSH_HOST}"
+    KVM_SSH_PORT="${KVM_SSH_PORT:-$KVM_DEFAULT_SSH_PORT}"
     # 7
-    VM_CLONE_TEMPLATE=`echo $LINE | cut -f 7 -d '|'`
-    VM_CLONE_TEMPLATE=`echo ${VM_CLONE_TEMPLATE}`
+    VM_CLONE_TEMPLATE=$(echo "$LINE" | cut -f 7 -d '|' | xargs)
     VM_CLONE_TEMPLATE=${VM_CLONE_TEMPLATE:-${VM_DEFAULT_CLONE_TEMPLATE}}
     # 8
-    VM_DISK_IMG_PATH=`echo $LINE | cut -f 8 -d '|'`
-    VM_DISK_IMG_PATH=`echo ${VM_DISK_IMG_PATH}`
+    VM_DISK_IMG_PATH=$(echo "$LINE" | cut -f 8 -d '|' | xargs)
     VM_DISK_IMG_PATH=${VM_DISK_IMG_PATH:-${VM_DEFAULT_DISK_IMG_PATH}}
     # 9
-    VM_NOTE=`echo $LINE | cut -f 9 -d '|'`
-    VM_NOTE=`echo ${VM_NOTE}`
+    VM_NOTE=$(echo "$LINE" | cut -f 9 -d '|' | xargs)
+    # x
+    KVM_XML_PATH=${KVM_DEFAULT_XML_PATH}
     #
     echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"    #-- 70 ( 80##  70++  60## )
-    echo "宿主机： ${KVM_HOST}"
+    echo "宿主机： ${KVM_SSH_HOST}"
     echo "克隆模板： ${VM_CLONE_TEMPLATE}"
     echo "新虚拟机名称：${VM_NAME}"
     echo "新虚拟机CPU(核)： ${VM_CPU}"
     echo "新虚拟机内存(GiB)：${VM_MEM}"
     echo "新虚拟机网卡：${VM_NIC}"
+    echo "备注：${VM_NOTE}"
     echo 
-    KVM_LIBVIRT_URL="qemu+ssh://${KVM_SSH_USER}@${KVM_HOST}:${KVM_SSH_PORT}/system"
+    KVM_LIBVIRT_URL="qemu+ssh://${KVM_SSH_USER}@${KVM_SSH_HOST}:${KVM_SSH_PORT}/system"
     #
-    true> ${VM_LIST_EXISTED}
-    virsh  --connect ${KVM_LIBVIRT_URL}  list --all  > ${VM_LIST_EXISTED}
+    true> "${VM_LIST_EXISTED}"
+    virsh  --connect "${KVM_LIBVIRT_URL} " list --all  > "${VM_LIST_EXISTED}"
     if [[ $? -ne 0 ]]; then
         echo -e "\n峰哥说：连接KVM宿主机失败，退出！\n"
         exit 1
     fi
     #
     # 删除无用行
-    sed -i '1,2d;s/[ ]*//;/^$/d'  ${VM_LIST_EXISTED}
+    sed -i '1,2d;s/[ ]*//;/^$/d'  "${VM_LIST_EXISTED}"
     #
     # 是否重名
     #
@@ -275,11 +293,11 @@ do
     # clone
     #
     VM_CLONE_LOG_FILE="${LOG_HOME}/${SH_NAME}-clone.log--${VM_NAME}"
-    true> ${VM_CLONE_LOG_FILE}
-    virt-clone  --connect ${KVM_LIBVIRT_URL}  \
-        -o ${VM_CLONE_TEMPLATE}  \
-        -n ${VM_NAME}  \
-        -f ${VM_DISK_IMG_PATH}/${VM_IMG}  | tee ${VM_CLONE_LOG_FILE} 2>&1
+    true> "${VM_CLONE_LOG_FILE}"
+    virt-clone  --connect "${KVM_LIBVIRT_URL}"  \
+        -o "${VM_CLONE_TEMPLATE}"  \
+        -n "${VM_NAME}"  \
+        -f "${VM_DISK_IMG_PATH}/${VM_IMG}"  | tee "${VM_CLONE_LOG_FILE}" 2>&1
     #
     #if [ "$(grep -i -q 'ERROR' "${VM_CLONE_LOG_FILE}"; echo $?)" -eq 0 ]; then
     #if [ "$(grep -i -q 'ERROR' "${VM_CLONE_LOG_FILE}"; echo $?)" ]; then
@@ -291,16 +309,16 @@ do
     # 修改xml
     #
     F_GEN_SED_SH="/tmp/${SH_NAME}-xml-sed.sh"
-    F_GEN_SED > ${F_GEN_SED_SH}
-    scp  -P ${KVM_HOST}  ${F_GEN_SED_SH}  ${KVM_SSH_USER}@${KVM_HOST}:${F_GEN_SED_SH}
+    F_GEN_SED > "${F_GEN_SED_SH}"
+    scp  -P "${KVM_SSH_PORT}"  "${F_GEN_SED_SH}"  "${KVM_SSH_USER}"@"${KVM_SSH_HOST}":"${F_GEN_SED_SH}"
     #
     #重新define虚拟机
-    ssh  -p ${KVM_SSH_PORT}  ${KVM_SSH_USER}@${KVM_HOST}  < /dev/null  "bash ${F_GEN_SED_SH}  &&  virsh define ${KVM_XML_PATH}/${VM_XML}"
+    ssh  -p "${KVM_SSH_PORT}"  "${KVM_SSH_USER}"@"${KVM_SSH_HOST}"  < /dev/null  "bash ${F_GEN_SED_SH}  &&  virsh define ${KVM_XML_PATH}/${VM_XML}"
     #
     # vm sysprep
-    bash  ${VM_SYSPREP_SH}  --quiet  "${VM_NAME}"
+    bash  "${VM_SYSPREP_SH}"  --quiet  "${VM_NAME}"
     #
-done < ${VM_LIST_TMP}
+done < "${VM_LIST_TMP}"
 
 
 

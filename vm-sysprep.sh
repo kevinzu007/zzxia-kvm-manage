@@ -246,8 +246,7 @@ else
             # 跳过以#开头的行或空行
             [[ $LINE =~ ^# ]] || [[ $LINE =~ ^[\ ]*$ ]] && continue
             #
-            VM_NAME=$(echo "$LINE" | awk -F '|' '{print $2}')
-            VM_NAME=$(echo "${VM_NAME}")
+            VM_NAME=$(echo "$LINE" | awk -F '|' '{print $2}' | xargs)
             if [[ ${VM_NAME} =~ ^$i$ ]]; then
                 echo "$LINE" >> "${VM_LIST_APPEND_1_TMP}"
                 GET_IT='YES'
@@ -286,46 +285,58 @@ fi
 while read -r LINE
 do
     # 2
-    VM_NAME=`echo $LINE | cut -f 2 -d '|'`
-    VM_NAME=`echo $VM_NAME`
+    VM_NAME=$(echo "${LINE}" | cut -f 2 -d '|' | xargs)
     # 3
-    VM_IP=`echo ${LINE} | cut -d \| -f 3`
-    VM_IP=`echo ${VM_IP}`
+    VM_IP=$(echo "${LINE}" | cut -d \| -f 3 | xargs)
     # 4
-    VM_IP_MASK=`echo ${LINE} | cut -d \| -f 4`
-    VM_IP_MASK=`echo ${VM_IP_MASK}`
+    VM_IP_MASK=$(echo "${LINE}" | cut -d \| -f 4 | xargs)
     # 5
-    VM_IP_GATEWAY=`echo ${LINE} | cut -d \| -f 5`
-    VM_IP_GATEWAY=`echo ${VM_IP_GATEWAY}`
+    VM_IP_GATEWAY=$(echo "${LINE}" | cut -d \| -f 5 | xargs)
     # 6
-    VM_DNS=`echo ${LINE} | cut -d \| -f 6`
-    VM_DNS=`echo ${VM_DNS}`
+    VM_DNS=$(echo "${LINE}" | cut -d \| -f 6 | xargs)
     VM_DNS=${VM_DNS-:${VM_DEFAULT_DOMAIN}}
-    VM_DNS1=`echo ${VM_DNS} | cut -d "," -f 1`
-    VM_DNS2=`echo ${VM_DNS} | cut -d "," -f 2`
+    VM_DNS1=$(echo "${VM_DNS}" | cut -d "," -f 1 | xargs)
+    VM_DNS2=$(echo "${VM_DNS}" | cut -d "," -f 2 | xargs)
     # 7
-    VM_DOMAIN=`echo ${LINE} | cut -d \| -f 7`
-    VM_DOMAIN=`echo ${VM_DOMAIN}`
+    VM_DOMAIN=$(echo "${LINE}" | cut -d \| -f 7 | xargs)
     VM_DOMAIN=${VM_DOMAIN-:${VM_DEFAULT_DOMAIN}}
     #
     # + VM_LIST
-    cat ${VM_LIST} | grep "${VM_NAME}"  >  ${VM_LIST_TMP}
+    grep "${VM_NAME}" "${VM_LIST}" > "${VM_LIST_TMP}"
     GET_IT_A='NO'
-    while read LINE_A
+    while read -r LINE_A
     do
         # 跳过以#开头的行或空行
         [[ "$LINE_A" =~ ^# ]] || [[ "$LINE_A" =~ ^[\ ]*$ ]] && continue
         # 2
-        VM_NAME_A=`echo ${LINE_A} | cut -d \| -f 2`
-        VM_NAME_A=`echo ${VM_NAME_A}`
+        VM_NAME_A=$(echo "${LINE_A}" | cut -d \| -f 2 | xargs)
         #
         if [[ "${VM_NAME_A}" == "${VM_NAME}" ]]; then
-            # 6
-            KVM_HOST=`echo $LINE_A | cut -f 6 -d '|'`
-            KVM_HOST=`echo ${KVM_HOST}`
             #
             GET_IT_A='YES'
             break     #-- 匹配1次
+            # 6
+            KVM_HOST=$(echo "$LINE" | cut -f 6 -d '|' | xargs)
+            #KVM_HOST=${KVM_HOST// /}
+            # 初始化变量
+            KVM_SSH_USER=""
+            KVM_SSH_HOST=""
+            KVM_SSH_PORT=""
+            # 使用模式匹配提取用户、主机和端口
+            if [[ -n "$KVM_HOST" ]]; then
+                if [[ $KVM_HOST =~ ^([^@]+)@([^:]+)(:([0-9]+))?$ ]]; then
+                    KVM_SSH_USER="${BASH_REMATCH[1]}"  # 提取用户
+                    KVM_SSH_HOST="${BASH_REMATCH[2]}"  # 提取主机
+                    KVM_SSH_PORT="${BASH_REMATCH[4]}"  # 提取端口
+                elif [[ $KVM_HOST =~ ^([^:]+)(:([0-9]+))?$ ]]; then
+                    KVM_SSH_HOST="${BASH_REMATCH[1]}"  # 提取主机
+                    KVM_SSH_PORT="${BASH_REMATCH[3]}"  # 提取端口
+                fi
+            fi
+            # 如果某个值为空，使用默认值
+            KVM_SSH_USER="${KVM_SSH_USER:-$KVM_DEFAULT_SSH_USER}"
+            KVM_SSH_HOST="${KVM_SSH_HOST:-$KVM_DEFAULT_SSH_HOST}"
+            KVM_SSH_PORT="${KVM_SSH_PORT:-$KVM_DEFAULT_SSH_PORT}"
         fi
     done < "${VM_LIST_TMP}"
     #
@@ -337,14 +348,14 @@ do
     #
     echo "--------------------------------------------------"     #--- 50 (60-50-40)   == --
     echo "虚拟机：${VM_NAME}"
-    echo "宿主机：${KVM_HOST}"
+    echo "宿主机：${KVM_SSH_HOST}"
     echo "虚拟机IP：  ${VM_IP}/${VM_IP_MASK}"
     echo "虚拟机网关：${VM_IP_GATEWAY}"
     echo "虚拟机DNS： ${VM_DNS}"
     echo "虚拟机FQDN：${VM_NAME}.${VM_DOMAIN}"
     echo
     #
-    KVM_LIBVIRT_URL="qemu+ssh://${KVM_SSH_USER}@${KVM_HOST}:${KVM_SSH_PORT}/system"
+    KVM_LIBVIRT_URL="qemu+ssh://${KVM_SSH_USER}@${KVM_SSH_HOST}:${KVM_SSH_PORT}/system"
     #
     true> "${VM_LIST_EXISTED}"
     virsh  --connect "${KVM_LIBVIRT_URL}"  list --all  > "${VM_LIST_EXISTED}"
@@ -372,7 +383,7 @@ do
     #
     ## 获取虚拟机OS版本信息
     #VM_OS_RELEASE_FILE="${LOG_HOME}/os-release"
-    #ssh  -p ${KVM_SSH_PORT}  ${KVM_SSH_USER}@${KVM_HOST}  "virt-cat  -d ${VM_NAME}  /etc/os-release"  > ${VM_OS_RELEASE_FILE}
+    #ssh  -p ${KVM_SSH_PORT}  ${KVM_SSH_USER}@${KVM_SSH_HOST}  "virt-cat  -d ${VM_NAME}  /etc/os-release"  > ${VM_OS_RELEASE_FILE}
     #VM_OS=$(cat ${VM_OS_RELEASE_FILE}  |  grep -E ^ID=  |  cut -d '"' -f 2)
     #VM_OS_VERSION=$(cat ${VM_OS_RELEASE_FILE}  |  grep -E ^VERSION_ID=  |  cut -d '"' -f 2)
     #VM_OS_PRETTY_NAME=$(cat ${VM_OS_RELEASE_FILE}  |  grep -E ^PRETTY_NAME=  |  cut -d '"' -f 2)
@@ -381,18 +392,18 @@ do
     #
     VM_HOSTS_FILE="${VM_CONF_DIR}hosts--${VM_NAME}"
     F_GEN_HOSTS     > "${VM_HOSTS_FILE}"
-    scp  -P ${KVM_SSH_PORT}  "${VM_HOSTS_FILE}"  ${KVM_SSH_USER}@"${KVM_HOST}":/tmp/hosts
+    scp  -P "${KVM_SSH_PORT}"  "${VM_HOSTS_FILE}"  "${KVM_SSH_USER}"@"${KVM_SSH_HOST}":/tmp/hosts
     #
     #
     VM_SYSPREP_LOG_FILE="${LOG_HOME}/${SH_NAME}-sysprep.log--${VM_NAME}"
     true> "${VM_SYSPREP_LOG_FILE}"
     #
-    #ssh  -p ${KVM_SSH_PORT}  ${KVM_SSH_USER}@${KVM_HOST}  "virt-sysprep  \
+    #ssh  -p ${KVM_SSH_PORT}  ${KVM_SSH_USER}@${KVM_SSH_HOST}  "virt-sysprep  \
     #    --copy-in ${VM_CONF_DIR}/${VM_HOSTS_FILENAME}:${VM_HOSTS_DEST_DIR}/  \
     #    --copy-in ${VM_CONF_DIR}/${VM_NIC_CONF_FILENAME}:${VM_NIC_CONF_DEST_DIR}/  \
     #    --hostname ${VM_NAME}.${VM_DOMAIN}  \
     #    -d ${VM_NAME}"  | tee ${VM_SYSPREP_LOG_FILE} 2>&1
-    ssh  -p "${KVM_SSH_PORT}"  "${KVM_SSH_USER}@${KVM_HOST}" < /dev/null  "virt-sysprep  \
+    ssh  -p "${KVM_SSH_PORT}"  "${KVM_SSH_USER}@${KVM_SSH_HOST}" < /dev/null  "virt-sysprep  \
         --copy-in /tmp/hosts:/etc/hosts  \
         --hostname ${VM_NAME}.${VM_DOMAIN}  \
         -d ${VM_NAME}"  | tee "${VM_SYSPREP_LOG_FILE}" 2>&1
@@ -409,9 +420,9 @@ do
     #
     VM_CLOUD_LOCALDS_CONF_FILE="${VM_CONF_DIR}/cloud_localds_conf.yaml--${VM_NAME}"
     F_GEN_CLOUD_LOCALDS_CONF  > "${VM_CLOUD_LOCALDS_CONF_FILE}"
-    scp  -P ${KVM_SSH_PORT}  "${VM_CLOUD_LOCALDS_CONF_FILE}"    ${KVM_SSH_USER}@"${KVM_HOST}":/tmp/cloud_localds_conf.yaml
+    scp  -P "${KVM_SSH_PORT}"  "${VM_CLOUD_LOCALDS_CONF_FILE}"    "${KVM_SSH_USER}"@"${KVM_SSH_HOST}":/tmp/cloud_localds_conf.yaml
     #
-    ssh  -p "${KVM_SSH_PORT}"  "${KVM_SSH_USER}@${KVM_HOST}" < /dev/null  "cloud-localds  /tmp/seed.iso  /tmp/cloud_localds_conf.yaml  \
+    ssh  -p "${KVM_SSH_PORT}"  "${KVM_SSH_USER}@${KVM_SSH_HOST}" < /dev/null  "cloud-localds  /tmp/seed.iso  /tmp/cloud_localds_conf.yaml  \
         &&  virsh attach-disk  ${VM_NAME}  --source /tmp/seed.iso  --target hdb  --type cdrom"   | tee "${VM_CLOUD_INIT_LOG_FILE}" 2>&1
     #
     if [ "$(grep -q -i 'ERROR' "${VM_CLOUD_INIT_LOG_FILE}"; echo $?)" -eq 0 ]; then
