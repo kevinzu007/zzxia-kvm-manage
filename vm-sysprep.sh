@@ -284,6 +284,8 @@ fi
 # go
 while read -r LINE
 do
+    # 跳过以#开头的行或空行
+    [[ "$LINE_A" =~ ^# ]] || [[ "$LINE_A" =~ ^[\ ]*$ ]] && continue
     # 2
     VM_NAME=$(echo "${LINE}" | cut -f 2 -d '|' | xargs)
     # 3
@@ -312,9 +314,6 @@ do
         VM_NAME_A=$(echo "${LINE_A}" | cut -d \| -f 2 | xargs)
         #
         if [[ "${VM_NAME_A}" == "${VM_NAME}" ]]; then
-            #
-            GET_IT_A='YES'
-            break     #-- 匹配1次
             # 6
             KVM_HOST=$(echo "$LINE" | cut -f 6 -d '|' | xargs)
             #KVM_HOST=${KVM_HOST// /}
@@ -337,6 +336,9 @@ do
             KVM_SSH_USER="${KVM_SSH_USER:-$KVM_DEFAULT_SSH_USER}"
             KVM_SSH_HOST="${KVM_SSH_HOST:-$KVM_DEFAULT_SSH_HOST}"
             KVM_SSH_PORT="${KVM_SSH_PORT:-$KVM_DEFAULT_SSH_PORT}"
+            #
+            GET_IT_A='YES'
+            break     #-- 匹配1次
         fi
     done < "${VM_LIST_TMP}"
     #
