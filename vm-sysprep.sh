@@ -315,7 +315,7 @@ do
         #
         if [[ "${VM_NAME_A}" == "${VM_NAME}" ]]; then
             # 6
-            KVM_HOST=$(echo "$LINE" | cut -f 6 -d '|' | xargs)
+            KVM_HOST=$(echo "$LINE_A" | cut -f 6 -d '|' | xargs)
             #KVM_HOST=${KVM_HOST// /}
             # 初始化变量
             KVM_SSH_USER=""
