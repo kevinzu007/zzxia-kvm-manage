@@ -400,15 +400,10 @@ do
     VM_SYSPREP_LOG_FILE="${LOG_HOME}/${SH_NAME}-sysprep.log--${VM_NAME}"
     true> "${VM_SYSPREP_LOG_FILE}"
     #
-    #ssh  -p ${KVM_SSH_PORT}  ${KVM_SSH_USER}@${KVM_SSH_HOST}  "virt-sysprep  \
-    #    --copy-in ${VM_CONF_DIR}/${VM_HOSTS_FILENAME}:${VM_HOSTS_DEST_DIR}/  \
-    #    --copy-in ${VM_CONF_DIR}/${VM_NIC_CONF_FILENAME}:${VM_NIC_CONF_DEST_DIR}/  \
-    #    --hostname ${VM_NAME}.${VM_DOMAIN}  \
-    #    -d ${VM_NAME}"  | tee ${VM_SYSPREP_LOG_FILE} 2>&1
     ssh  -p "${KVM_SSH_PORT}"  "${KVM_SSH_USER}@${KVM_SSH_HOST}" < /dev/null  "virt-sysprep  \
-        --copy-in /tmp/hosts:/etc/hosts  \
+        --copy-in /tmp/hosts:/etc/  \
         --hostname ${VM_NAME}.${VM_DOMAIN}  \
-        -d ${VM_NAME}"  | tee "${VM_SYSPREP_LOG_FILE}" 2>&1
+        -d ${VM_NAME}" 2>&1  | tee "${VM_SYSPREP_LOG_FILE}"
     #
     if [ "$(grep -q -i 'ERROR' "${VM_SYSPREP_LOG_FILE}"; echo $?)" -eq 0 ]; then
         echo "【${VM_NAME}】virt-sysprep出错，请检查！"
@@ -425,6 +420,8 @@ do
     scp  -P "${KVM_SSH_PORT}"  "${VM_CLOUD_LOCALDS_CONF_FILE}"    "${KVM_SSH_USER}"@"${KVM_SSH_HOST}":/tmp/cloud_localds_conf.yaml
     #
     ssh  -p "${KVM_SSH_PORT}"  "${KVM_SSH_USER}@${KVM_SSH_HOST}" < /dev/null  "cloud-localds  /tmp/seed.iso  /tmp/cloud_localds_conf.yaml  \
+        &&  virsh start ${VM_NAME}  \
+        &&  sleep 10  \
         &&  virsh attach-disk  ${VM_NAME}  --source /tmp/seed.iso  --target hdb  --type cdrom"   | tee "${VM_CLOUD_INIT_LOG_FILE}" 2>&1
     #
     if [ "$(grep -q -i 'ERROR' "${VM_CLOUD_INIT_LOG_FILE}"; echo $?)" -eq 0 ]; then
