@@ -285,7 +285,7 @@ fi
 while read -r LINE
 do
     # 跳过以#开头的行或空行
-    [[ "$LINE_A" =~ ^# ]] || [[ "$LINE_A" =~ ^[\ ]*$ ]] && continue
+    [[ "$LINE" =~ ^# ]] || [[ "$LINE" =~ ^[\ ]*$ ]] && continue
     # 2
     VM_NAME=$(echo "${LINE}" | cut -f 2 -d '|' | xargs)
     # 3
