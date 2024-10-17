@@ -263,7 +263,7 @@ do
     KVM_LIBVIRT_URL="qemu+ssh://${KVM_SSH_USER}@${KVM_SSH_HOST}:${KVM_SSH_PORT}/system"
     #
     true> "${VM_LIST_EXISTED}"
-    virsh  --connect "${KVM_LIBVIRT_URL} " list --all  > "${VM_LIST_EXISTED}"
+    virsh  --connect "${KVM_LIBVIRT_URL}" list --all  > "${VM_LIST_EXISTED}"
     if [[ $? -ne 0 ]]; then
         echo -e "\n峰哥说：连接KVM宿主机失败，退出！\n"
         exit 1
