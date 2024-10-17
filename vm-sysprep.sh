@@ -392,7 +392,7 @@ do
     #
     # hosts
     #
-    VM_HOSTS_FILE="${VM_CONF_DIR}hosts--${VM_NAME}"
+    VM_HOSTS_FILE="${VM_CONF_DIR}/hosts--${VM_NAME}"
     F_GEN_HOSTS     > "${VM_HOSTS_FILE}"
     scp  -P "${KVM_SSH_PORT}"  "${VM_HOSTS_FILE}"  "${KVM_SSH_USER}"@"${KVM_SSH_HOST}":/tmp/hosts
     #
