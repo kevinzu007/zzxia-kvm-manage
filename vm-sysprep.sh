@@ -299,12 +299,12 @@ do
     VM_IP_GATEWAY=$(echo "${LINE}" | cut -d \| -f 5 | xargs)
     # 6
     VM_DNS=$(echo "${LINE}" | cut -d \| -f 6 | xargs)
-    VM_DNS=${VM_DNS-:${VM_DEFAULT_DOMAIN}}
+    VM_DNS=${VM_DNS:-${VM_DEFAULT_DOMAIN}}
     VM_DNS1=$(echo "${VM_DNS}" | cut -d "," -f 1 | xargs)
     VM_DNS2=$(echo "${VM_DNS}" | cut -d "," -f 2 | xargs)
     # 7
     VM_DOMAIN=$(echo "${LINE}" | cut -d \| -f 7 | xargs)
-    VM_DOMAIN=${VM_DOMAIN-:${VM_DEFAULT_DOMAIN}}
+    VM_DOMAIN=${VM_DOMAIN:-${VM_DEFAULT_DOMAIN}}
     #
     # + VM_LIST
     grep "${VM_NAME}" "${VM_LIST}" > "${VM_LIST_TMP}"
