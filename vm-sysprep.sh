@@ -179,11 +179,15 @@ EOF
 F_GEN_CLOUD_LOCALDS_CONF ()
 {
     cat << EOF
+hostname: v-192-168-11-190-deploy11
+manage_etc_hosts: true
+
 network:
   version: 2
   ethernets:
     eth0:
       dhcp4: no
+      dhcp6: yes
       addresses:
         - ${VM_IP}/${VM_IP_MASK}
       gateway4: ${VM_IP_GATEWAY}
