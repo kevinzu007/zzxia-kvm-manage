@@ -17,6 +17,9 @@ cd "${SH_PATH}" || exit 1
 #LOG_HOME=
 #VM_DEFAULT_DNS=
 #VM_DEFAULT_DOMAIN=
+#KVM_DEFAULT_SSH_HOST=
+#KVM_DEFAULT_SSH_PORT=
+#KVM_DEFAULT_SSH_USER=
 
 # 本地env
 QUIET='NO'     #-- 静默方式
@@ -419,10 +422,29 @@ do
     F_GEN_CLOUD_LOCALDS_CONF  > "${VM_CLOUD_LOCALDS_CONF_FILE}"
     scp  -P "${KVM_SSH_PORT}"  "${VM_CLOUD_LOCALDS_CONF_FILE}"    "${KVM_SSH_USER}"@"${KVM_SSH_HOST}":/tmp/cloud_localds_conf.yaml
     #
+    # 获取VM的cdrom信息
+    VM_XML=$(virsh dumpxml "$VM_NAME")
+    if [ $? -ne 0 ]; then
+        echo "无法获取虚拟机 $VM_NAME 的 XML 配置"
+        exit 1
+    fi
+    # 判断是否存在 <disk type="file" device="cdrom"> 节点
+    if ! echo "$VM_XML" | xmllint --xpath "//disk[@type='file' and @device='cdrom']" - 2>/dev/null; then
+        echo "没有找到匹配的 <disk type='file' device='cdrom'> 信息。"
+        exit 1
+    fi
+    #
+    VM_CDROM_DEV=''
+    VM_CDROM_DEV=$(echo "$VM_XML" | xmllint --xpath "string(//disk[@type='file'][@device='cdrom']/target[@bus='sata' or @bus='scsi']/@dev)" - 2>/dev/null)   #-- 只有sata及scsi支持热拔插
+    if [[ -z ${VM_CDROM_DEV} ]]; then
+        echo "cdrom设备不支持热插拔"
+        exit 1
+    fi
+    #
     ssh  -p "${KVM_SSH_PORT}"  "${KVM_SSH_USER}@${KVM_SSH_HOST}" < /dev/null  "cloud-localds  /tmp/seed.iso  /tmp/cloud_localds_conf.yaml  \
         &&  virsh start ${VM_NAME}  \
         &&  sleep 10  \
-        &&  virsh attach-disk  ${VM_NAME}  --source /tmp/seed.iso  --target hdb  --type cdrom"   | tee "${VM_CLOUD_INIT_LOG_FILE}" 2>&1
+        &&  virsh attach-disk  ${VM_NAME}  --source /tmp/seed.iso  --target ${VM_CDROM_DEV}  --type cdrom"   | tee "${VM_CLOUD_INIT_LOG_FILE}" 2>&1
     #
     if [ "$(grep -q -i 'ERROR' "${VM_CLOUD_INIT_LOG_FILE}"; echo $?)" -eq 0 ]; then
         echo "【${VM_NAME}】cloud-init出错，请检查！"
