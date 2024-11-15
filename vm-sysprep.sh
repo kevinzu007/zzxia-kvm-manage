@@ -493,7 +493,7 @@ do
         &&  sleep 10  \
         &&  virsh attach-disk  ${VM_NAME}  --source /tmp/cloud-init.iso  --target ${VM_CDROM_DEV}  --type cdrom"   | tee "${VM_CLOUD_INIT_LOG_FILE}" 2>&1
     #
-    if [ "$(grep -q -i 'ERROR' "${VM_CLOUD_INIT_LOG_FILE}"; echo $?)" -eq 0 ]; then
+    if [[ "$(grep -q -i 'ERROR' "${VM_CLOUD_INIT_LOG_FILE}"; echo $?)" -ne 0 ]]; then
         echo "【${VM_NAME}】cloud-init出错，请检查！"
         exit 1
     fi
