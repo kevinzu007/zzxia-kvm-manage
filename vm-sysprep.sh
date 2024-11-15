@@ -174,20 +174,24 @@ EOF
 }
 
 
-# 生成cloud-localds网卡配置
-# 用法：F_GEN_CLOUD_LOCALDS_CONF
-F_GEN_CLOUD_LOCALDS_CONF ()
+
+# 生成cloud user-data
+# 目前网卡设备名为自动获取。。。。。。。。
+# 用法：F_GEN_CLOUD_USER_DATA
+F_GEN_CLOUD_USER_DATA ()
 {
     cat << EOF
 hostname: v-192-168-11-190-deploy11
+fqdn: v-192-168-11-190-deploy11.example.com
 manage_etc_hosts: true
 
+# 设置静态IP
 network:
   version: 2
   ethernets:
     eth0:
-      dhcp4: no
-      dhcp6: yes
+      dhcp4: false
+      dhcp6: true
       addresses:
         - ${VM_IP}/${VM_IP_MASK}
       gateway4: ${VM_IP_GATEWAY}
@@ -195,6 +199,38 @@ network:
         addresses:
           - ${VM_DNS1}
           - ${VM_DNS2}
+
+# 创建用户，并授权 SSH 密钥
+users:
+  - name: myuser
+    ssh-authorized-keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDqPy30ZKPAniS5XqIxgvtwITt6ImnJFmkiYjk2szZwg9Ctme9tFUR6l4Q9eGuRXiojlU4eEoeFlZVMU6S+ZNDj5KOjQ3NIB9fa7ShWo9HoYhXHV7QuMqKkF2Z2TtfDIkwUgz+sxePOQ65QtaZOUdXfchtJl1awN5INV8/kZ4ZzeEi7bAUn3EIO8myui3urXra/C6uHrafTj8/UPNVfzDY29Kl+r4T2yfJ+b5fKt/KRLECGpxwzDbVsilt2Npl971n4bGL3/OfJ9QumwetgdSPkkMzfmlCffuwIWVFnRwjrGS7hib/jjdDaNqsSn3LuN2UTVRsECv0n9W0Uza1mA1b1 myuser@v-192-168-11-81-deploy.zjlh.lan
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+
+# 安装软件包
+packages:
+  - vim
+  - curl
+  - git
+
+# 执行脚本（例如设置时区）
+runcmd:
+  - timedatectl set-timezone Asia/Shanghai
+
+# SSH验证
+ssh_pwauth: true
+EOF
+}
+
+
+
+# 生成cloud meta-data
+# 用法：F_GEN_CLOUD_META_DATA
+F_GEN_CLOUD_META_DATA ()
+{
+    cat << EOF
+instance-id: my-instance-id
+#local-hostname: myhost
 EOF
 }
 
@@ -202,7 +238,7 @@ EOF
 
 # 参数检查
 TEMP=$(getopt -o hq  -l help,quiet -- "$@")
-if [ $? -ne 0 ]; then
+if [[ $? -ne 0 ]]; then
     echo -e "\n峰哥说：参数不合法，请查看帮助【$0 --help】\n"
     exit 1
 fi
@@ -386,14 +422,16 @@ do
         exit 1
     fi
     #
-    # virt-sysprep
+    #
+    ### virt-sysprep
+    #
     #
     VM_CONF_DIR="/tmp"
     #
     ## 获取虚拟机OS版本信息
-    #VM_OS_RELEASE_FILE="${LOG_HOME}/os-release"
-    #ssh  -p ${KVM_SSH_PORT}  ${KVM_SSH_USER}@${KVM_SSH_HOST}  "virt-cat  -d ${VM_NAME}  /etc/os-release"  > ${VM_OS_RELEASE_FILE}
-    #VM_OS=$(cat ${VM_OS_RELEASE_FILE}  |  grep -E ^ID=  |  cut -d '"' -f 2)
+    VM_OS_RELEASE_FILE="${LOG_HOME}/os-release"
+    ssh  -p ${KVM_SSH_PORT}  ${KVM_SSH_USER}@${KVM_SSH_HOST}  "virt-cat  -d ${VM_NAME}  /etc/os-release"  > ${VM_OS_RELEASE_FILE}
+    VM_OS=$(cat ${VM_OS_RELEASE_FILE}  |  grep -E ^ID=  |  cut -d '"' -f 2)
     #VM_OS_VERSION=$(cat ${VM_OS_RELEASE_FILE}  |  grep -E ^VERSION_ID=  |  cut -d '"' -f 2)
     #VM_OS_PRETTY_NAME=$(cat ${VM_OS_RELEASE_FILE}  |  grep -E ^PRETTY_NAME=  |  cut -d '"' -f 2)
     #
@@ -417,14 +455,19 @@ do
         exit 1
     fi
     #
-    # cloud-init
+    #
+    ### cloud-init
+    #
     #
     VM_CLOUD_INIT_LOG_FILE="${LOG_HOME}/${SH_NAME}-cloud-init.log--${VM_NAME}"
     true> "${VM_CLOUD_INIT_LOG_FILE}"
     #
-    VM_CLOUD_LOCALDS_CONF_FILE="${VM_CONF_DIR}/cloud_localds_conf.yaml--${VM_NAME}"
-    F_GEN_CLOUD_LOCALDS_CONF  > "${VM_CLOUD_LOCALDS_CONF_FILE}"
-    scp  -P "${KVM_SSH_PORT}"  "${VM_CLOUD_LOCALDS_CONF_FILE}"    "${KVM_SSH_USER}"@"${KVM_SSH_HOST}":/tmp/cloud_localds_conf.yaml
+    VM_CLOUD_user_data_FILE="${VM_CONF_DIR}/user-data--${VM_NAME}"
+    F_GEN_CLOUD_USER_DATA  > "${VM_CLOUD_user_data_FILE}"
+    VM_CLOUD_meta_data_FILE="${VM_CONF_DIR}/meta-data--${VM_NAME}"
+    F_GEN_CLOUD_META_DATA  > "${VM_CLOUD_meta_data_FILE}"
+    scp  -P "${KVM_SSH_PORT}"  "${VM_CLOUD_user_data_FILE}"    "${KVM_SSH_USER}"@"${KVM_SSH_HOST}":/tmp/user-data
+    scp  -P "${KVM_SSH_PORT}"  "${VM_CLOUD_meta_data_FILE}"    "${KVM_SSH_USER}"@"${KVM_SSH_HOST}":/tmp/meta-data
     #
     # 获取VM的cdrom信息
     VM_XML=$(virsh dumpxml "$VM_NAME")
@@ -445,10 +488,11 @@ do
         exit 1
     fi
     #
-    ssh  -p "${KVM_SSH_PORT}"  "${KVM_SSH_USER}@${KVM_SSH_HOST}" < /dev/null  "cloud-localds  /tmp/seed.iso  /tmp/cloud_localds_conf.yaml  \
+    ssh  -p "${KVM_SSH_PORT}"  "${KVM_SSH_USER}@${KVM_SSH_HOST}" < /dev/null  "rm -f  /tmp/cloud-init.iso  /tmp/user-data  /tmp/meta-dat  \
+        &&  cloud-localds  /tmp/cloud-init.iso  /tmp/user-data  /tmp/meta-data  \
         &&  virsh start ${VM_NAME}  \
         &&  sleep 10  \
-        &&  virsh attach-disk  ${VM_NAME}  --source /tmp/seed.iso  --target ${VM_CDROM_DEV}  --type cdrom"   | tee "${VM_CLOUD_INIT_LOG_FILE}" 2>&1
+        &&  virsh attach-disk  ${VM_NAME}  --source /tmp/cloud-init.iso  --target ${VM_CDROM_DEV}  --type cdrom"   | tee "${VM_CLOUD_INIT_LOG_FILE}" 2>&1
     #
     if [ "$(grep -q -i 'ERROR' "${VM_CLOUD_INIT_LOG_FILE}"; echo $?)" -eq 0 ]; then
         echo "【${VM_NAME}】cloud-init出错，请检查！"
