@@ -488,8 +488,7 @@ do
         exit 1
     fi
     #
-    ssh  -p "${KVM_SSH_PORT}"  "${KVM_SSH_USER}@${KVM_SSH_HOST}" < /dev/null  "rm -f  /tmp/cloud-init.iso  /tmp/user-data  /tmp/meta-dat  \
-        &&  cloud-localds  /tmp/cloud-init.iso  /tmp/user-data  /tmp/meta-data  \
+    ssh  -p "${KVM_SSH_PORT}"  "${KVM_SSH_USER}@${KVM_SSH_HOST}" < /dev/null  "cloud-localds  /tmp/cloud-init.iso  /tmp/user-data  /tmp/meta-data  \
         &&  virsh start ${VM_NAME}  \
         &&  sleep 10  \
         &&  virsh attach-disk  ${VM_NAME}  --source /tmp/cloud-init.iso  --target ${VM_CDROM_DEV}  --type cdrom"   | tee "${VM_CLOUD_INIT_LOG_FILE}" 2>&1
