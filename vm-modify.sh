@@ -352,6 +352,9 @@ do
     ### virt-customize
     #
     #
+    # 此文件在 VM 内部
+    VIRT_FIRSTBOOT_SH_LOG="/var/log/${SH_NAME}-VIRT_FIRSTBOOT_SH.log"
+    #
     VIRT_RUN_SH_FILE="${LOG_HOME}/virt-customize-run-script.sh"
     VIRT_RUN_SH  > ${VIRT_RUN_SH_FILE}
     chmod +x ${VIRT_RUN_SH_FILE}
@@ -361,9 +364,6 @@ do
     #
     VIRT_CUSTOMIZE_LOG_FILE="${LOG_HOME}/${SH_NAME}-virt-customize.log--${VM_NAME}"
     true> "${VIRT_CUSTOMIZE_LOG_FILE}"
-    #
-    # 此文件在 VM 内部
-    VIRT_FIRSTBOOT_SH_LOG="/var/log/${SH_NAME}-VIRT_FIRSTBOOT_SH.log"
     #
     virt-customize  \
         --connect "${KVM_LIBVIRT_URL}"  \
