@@ -2,7 +2,7 @@
 #############################################################################
 # Create By: 猪猪侠
 # License: GNU GPLv3
-# Test On: CentOS 7
+# Test On: Rocky Linux 9
 #############################################################################
 
 
@@ -31,7 +31,7 @@ VM_LIST_TMP="${LOG_HOME}/${SH_NAME}-my_vm.list.tmp"
 #VM_LIST_APPEND_1_TMP="${LOG_HOME}/${SH_NAME}-my_vm.list.append.1.tmp"
 VM_LIST_EXISTED="${LOG_HOME}/${SH_NAME}-vm-list.existed"
 #
-VM_SYSPREP_SH="${SH_PATH}/vm-sysprep.sh"
+VM_MODIFY_SH="${SH_PATH}/vm-modify.sh"
 FORMAT_TABLE_SH="${SH_PATH}/format_table.sh"
 
 
@@ -44,7 +44,7 @@ F_HELP()
         ${SH_PATH}/kvm.env
         ${VM_LIST}
         ${FORMAT_TABLE_SH}
-        ${VM_SYSPREP_SH}
+        ${VM_MODIFY_SH}
     注意：
         * 名称正则表达式完全匹配，会自动在正则表达式的头尾加上【^ $】，请规避
         * 输入命令时，参数顺序不分先后
@@ -102,9 +102,8 @@ F_GEN_SED ()
 {
     cat << EOF
 #!/bin/bash
-sed -i  s/"<vcpu.*vcpu>"/"<vcpu placement='static'>${VM_CPU}<\/vcpu>"/g  "${KVM_XML_PATH}/${VM_XML}"
-sed -i  s/"<memory.*memory>"/"<memory unit='GiB'>${VM_MEM}<\/memory>"/g  "${KVM_XML_PATH}/${VM_XML}"
-sed -i  s/"<currentMemory.*currentMemory>"/"<currentMemory unit='GiB'>${VM_MEM}<\/currentMemory>"/g  "${KVM_XML_PATH}/${VM_XML}"
+#
+# 网卡
 sed -i  s/"<source bridge=.*$"/"<source bridge='${VM_NIC}'\/>"/g  "${KVM_XML_PATH}/${VM_XML}"
 #
 # On CentOS7 BUG修复，参考：https://bugs.centos.org/view.php?id=10402
@@ -118,7 +117,7 @@ EOF
 # 参数检查
 TEMP=$(getopt -o hq  -l help,quiet -- "$@")
 if [ $? != 0 ]; then
-    echo -e "\n峰哥说：参数不合法，请查看帮助【$0 --help】\n"
+    echo -e "\n猪猪侠警告：参数不合法，请查看帮助【$0 --help】\n"
     exit 1
 fi
 #
@@ -141,7 +140,7 @@ do
             break
             ;;
         *)
-            echo -e "\n峰哥说：未知参数，请查看帮助【$0 --help】\n"
+            echo -e "\n猪猪侠警告：未知参数，请查看帮助【$0 --help】\n"
             exit 1
             ;;
     esac
@@ -263,9 +262,11 @@ do
     KVM_LIBVIRT_URL="qemu+ssh://${KVM_SSH_USER}@${KVM_SSH_HOST}:${KVM_SSH_PORT}/system"
     #
     true> "${VM_LIST_EXISTED}"
-    virsh  --connect "${KVM_LIBVIRT_URL}" list --all  > "${VM_LIST_EXISTED}"
-    if [[ $? -ne 0 ]]; then
-        echo -e "\n峰哥说：连接KVM宿主机失败，退出！\n"
+    if ! virsh --connect "${KVM_LIBVIRT_URL}" list --all > "${VM_LIST_EXISTED}"; then
+        echo -e "\n\033[31m猪猪侠警告：连接KVM宿主机失败，请检查以下问题：\033[0m"
+        echo -e "1. libvirt服务是否运行？(systemctl status libvirtd)"
+        echo -e "2. 连接URL是否正确？(当前尝试连接: ${KVM_LIBVIRT_URL})"
+        echo -e "3. 是否有访问权限？(检查用户是否在libvirt组)\n"
         exit 1
     fi
     #
@@ -275,7 +276,7 @@ do
     # 是否重名
     #
     if [[ $(F_SEARCH_EXISTED_VM  "${VM_NAME}" > /dev/null 2>&1; echo $?) -eq 0 ]]; then
-        echo -e "\n峰哥说：虚拟机【${VM_NAME}】已存在，跳过\n"
+        echo -e "\n猪猪侠警告：虚拟机【${VM_NAME}】已存在，跳过\n"
         continue
     fi
     #
@@ -283,10 +284,10 @@ do
     #
     VM_STATUS=$(F_SEARCH_EXISTED_VM  "${VM_CLONE_TEMPLATE}")
     if [[ -z ${VM_STATUS} ]]; then
-        echo -e "\n峰哥说：克隆模板【${VM_CLONE_TEMPLATE}】不存在存在，退出\n"
+        echo -e "\n猪猪侠警告：克隆模板【${VM_CLONE_TEMPLATE}】不存在存在，退出\n"
         exit 1
     elif [[ ${VM_STATUS} =~ 'running'|'运行' ]]; then
-        echo -e "\n峰哥说：克隆模板【${VM_CLONE_TEMPLATE}】在运行中，请先停止，退出\n"
+        echo -e "\n猪猪侠警告：克隆模板【${VM_CLONE_TEMPLATE}】在运行中，请先停止，退出\n"
         exit 1
     fi
     #
@@ -299,15 +300,16 @@ do
         -n "${VM_NAME}"  \
         -f "${VM_DISK_IMG_PATH}/${VM_IMG}"  | tee "${VM_CLONE_LOG_FILE}" 2>&1
     #
-    #if [ "$(grep -i -q 'ERROR' "${VM_CLONE_LOG_FILE}"; echo $?)" -eq 0 ]; then
-    #if [ "$(grep -i -q 'ERROR' "${VM_CLONE_LOG_FILE}"; echo $?)" ]; then
     if grep -i -q 'ERROR' "${VM_CLONE_LOG_FILE}"; then
-        echo "【${VM_NAME}】clone 出错，请检查！"
+        echo -e "\n猪猪侠警告：【${VM_NAME}】clone 出错，请检查！\n"
         exit 1
     fi
     #
-    # 修改xml
+    # CPU、MEM
+    virsh setvcpus  ${VM_NAME} ${VM_CPU}   --config
+    virsh setmem    ${VM_NAME} ${VM_MEM}G  --config     #-- 以GiB 为单位
     #
+    # 修改xml for 网卡及其他
     F_GEN_SED_SH="/tmp/${SH_NAME}-xml-sed.sh"
     F_GEN_SED > "${F_GEN_SED_SH}"
     scp  -P "${KVM_SSH_PORT}"  "${F_GEN_SED_SH}"  "${KVM_SSH_USER}"@"${KVM_SSH_HOST}":"${F_GEN_SED_SH}"
@@ -316,7 +318,7 @@ do
     ssh  -p "${KVM_SSH_PORT}"  "${KVM_SSH_USER}"@"${KVM_SSH_HOST}"  < /dev/null  "bash ${F_GEN_SED_SH}  &&  virsh define ${KVM_XML_PATH}/${VM_XML}"
     #
     # vm sysprep
-    bash  "${VM_SYSPREP_SH}"  --quiet  "${VM_NAME}"
+    bash  "${VM_MODIFY_SH}"  --quiet  "${VM_NAME}"
     #
 done < "${VM_LIST_TMP}"
 
