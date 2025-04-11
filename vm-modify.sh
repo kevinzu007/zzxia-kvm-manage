@@ -129,7 +129,7 @@ if [ -z "\${NET_IF}" ]; then
   exit 1
 fi
 #
-NET_IF_CONN_NAME=\"${NET_IF}"
+NET_IF_CONN_NAME="\${NET_IF}"
 # 清理旧配置（如果存在）
 nmcli connection delete \${NET_IF_CONN_NAME}  >/dev/null 2>&1
 # 创建网络连接名称
