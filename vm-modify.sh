@@ -112,20 +112,21 @@ EOF
 
 
 
-# 第一次boot时运行
+# 第一次boot时运行（就是在 virsh start 之后才会运行）
 VIRT_FIRSTBOOT_SH ()
 {
     cat << EOF
 #!/bin/bash
 # 注意：函数内部的变量必须转义
 #
-true > ${VIRT_FIRSTBOOT_SH_LOG}
+VIRT_FIRSTBOOT_SH_LOG="/var/log/${SH_NAME}-VIRT_FIRSTBOOT_SH.log"
+true > \${VIRT_FIRSTBOOT_SH_LOG}
 #
 ## 网卡
 # 动态检测第一个非回环接口
 NET_IF=\$(ip -o link show | awk '\$2 != "lo:" {print \$2; exit}' | sed 's/:$//')
 if [ -z "\${NET_IF}" ]; then
-  echo "猪猪侠警告：未发现网络接口，请检查！"  >> ${VIRT_FIRSTBOOT_SH_LOG}
+  echo "猪猪侠警告：未发现网络接口，请检查！"  >> \${VIRT_FIRSTBOOT_SH_LOG}
   exit 1
 fi
 #
@@ -136,16 +137,16 @@ nmcli connection delete \${NET_IF_CONN_NAME}  >/dev/null 2>&1
 nmcli connection add  \
     type ethernet  \
     ifname \${NET_IF}  \
-    con-name \${NET_IF_CONN_NAME}
+    con-name \${NET_IF_CONN_NAME}  >> \${VIRT_FIRSTBOOT_SH_LOG}  2>&1
 # 设置IP等
 nmcli connection modify "\${NET_IF_CONN_NAME}" \
     ipv4.method manual \
     ipv4.addresses "${VM_IP}/${VM_IP_MASK}" \
     ipv4.gateway "${VM_IP_GATEWAY}" \
     ipv4.dns "${VM_DNS1},${VM_DNS2}" \
-    ipv4.dns-search "${VM_DOMAIN}"  >> ${VIRT_FIRSTBOOT_SH_LOG}  2>&1
+    ipv4.dns-search "${VM_DOMAIN}"  >> \${VIRT_FIRSTBOOT_SH_LOG}  2>&1
 # up
-nmcli connection up  \${NET_IF_CONN_NAME}  >> ${VIRT_FIRSTBOOT_SH_LOG}  2>&1
+nmcli connection up  \${NET_IF_CONN_NAME}  >> \${VIRT_FIRSTBOOT_SH_LOG}  2>&1
 EOF
 }
 
@@ -352,9 +353,6 @@ do
     ### virt-customize
     #
     #
-    # 此文件在 VM 内部
-    VIRT_FIRSTBOOT_SH_LOG="/var/log/${SH_NAME}-VIRT_FIRSTBOOT_SH.log"
-    #
     VIRT_RUN_SH_FILE="${LOG_HOME}/virt-customize-run-script.sh"
     VIRT_RUN_SH  > ${VIRT_RUN_SH_FILE}
     chmod +x ${VIRT_RUN_SH_FILE}
@@ -374,11 +372,6 @@ do
     #
     if [ "$(grep -q -i 'ERROR' "${VIRT_CUSTOMIZE_LOG_FILE}"; echo $?)" -eq 0 ]; then
         echo -e "\n猪猪侠警告：【${VM_NAME}】virt-customize 出错，请检查！\n（检查方法：cat ${VIRT_CUSTOMIZE_LOG_FILE}）\n"
-        exit 1
-    fi
-    #
-    if grep -iE '猪猪侠警告|ERROR' <(virt-cat -d "${VM_NAME}" "${VIRT_FIRSTBOOT_SH_LOG}"); then
-        echo -e "\n猪猪侠警告：【${VM_NAME}】virt-customize --firstboot 出错，请检查！\n（检查方法：virt-cat -c ${KVM_LIBVIRT_URL} -d ${VM_NAME} ${VIRT_FIRSTBOOT_SH_LOG}）\n"
         exit 1
     fi
     #
