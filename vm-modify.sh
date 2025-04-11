@@ -117,7 +117,8 @@ VIRT_FIRSTBOOT_SH ()
 {
     cat << EOF
 #!/bin/bash
-VIRT_FIRSTBOOT_SH_LOG="/var/log/${SH_NAME}-VIRT_FIRSTBOOT_SH.log"
+# 注意：函数内部的变量必须转义
+#
 true > ${VIRT_FIRSTBOOT_SH_LOG}
 #
 ## 网卡
@@ -128,23 +129,23 @@ if [ -z "\${NET_IF}" ]; then
   exit 1
 fi
 #
-NET_IF_CONN_NAME="${NET_IF}"
+NET_IF_CONN_NAME=\"${NET_IF}"
 # 清理旧配置（如果存在）
-nmcli connection delete ${NET_IF_CONN_NAME}  >/dev/null 2>&1
+nmcli connection delete \${NET_IF_CONN_NAME}  >/dev/null 2>&1
 # 创建网络连接名称
 nmcli connection add  \
     type ethernet  \
-    ifname ${NET_IF}  \
-    con-name ${NET_IF_CONN_NAME}
+    ifname \${NET_IF}  \
+    con-name \${NET_IF_CONN_NAME}
 # 设置IP等
-nmcli connection modify "${NET_IF_CONN_NAME}" \
+nmcli connection modify "\${NET_IF_CONN_NAME}" \
     ipv4.method manual \
     ipv4.addresses "${VM_IP}/${VM_IP_MASK}" \
     ipv4.gateway "${VM_IP_GATEWAY}" \
     ipv4.dns "${VM_DNS1},${VM_DNS2}" \
     ipv4.dns-search "${VM_DOMAIN}"  >> ${VIRT_FIRSTBOOT_SH_LOG}  2>&1
 # up
-nmcli connection up  ${NET_IF_CONN_NAME}  >> ${VIRT_FIRSTBOOT_SH_LOG}  2>&1
+nmcli connection up  \${NET_IF_CONN_NAME}  >> ${VIRT_FIRSTBOOT_SH_LOG}  2>&1
 EOF
 }
 
@@ -360,6 +361,9 @@ do
     #
     VIRT_CUSTOMIZE_LOG_FILE="${LOG_HOME}/${SH_NAME}-virt-customize.log--${VM_NAME}"
     true> "${VIRT_CUSTOMIZE_LOG_FILE}"
+    #
+    # 此文件在 VM 内部
+    VIRT_FIRSTBOOT_SH_LOG="/var/log/${SH_NAME}-VIRT_FIRSTBOOT_SH.log"
     #
     virt-customize  \
         --connect "${KVM_LIBVIRT_URL}"  \
