@@ -2,17 +2,18 @@
 #############################################################################
 # Create By: 猪猪侠
 # License: GNU GPLv3
-# Test On: CentOS 7
+# Test On: Rocky Linux 9
 #############################################################################
 
 
 # sh
 SH_NAME=${0##*/}
 SH_PATH=$( cd "$( dirname "$0" )" && pwd )
-cd ${SH_PATH}
+cd "${SH_PATH}" || exit 1
 
 # 引入env
-. ${SH_PATH}/kvm.env
+# shellcheck source=/home/kevin/git-projects/zzxia-kvm-manage/kvm.env.sample
+. "${SH_PATH}/kvm.env"
 #QUIET=
 
 # 本地env
@@ -127,13 +128,15 @@ F_RM_VM ()
 
 
 # 参数检查
-TEMP=`getopt -o hlf:SAq  -l help,list,file:,select,ARG,quiet -- "$@"`
-if [ $? != 0 ]; then
-    echo -e "\n峰哥说：参数不合法，请查看帮助【$0 --help】\n"
+TEMP=$(getopt -o hlf:SAq  -l help,list,file:,select,ARG,quiet -- "$@") || {
+    echo -e "\n猪猪侠警告：参数不合法，请查看帮助【$0 --help】\n"
     exit 1
-fi
+}
 #
-eval set -- "${TEMP}"
+eval set -- "${TEMP}" || {
+    echo -e "\n猪猪侠警告：参数设置失败！\n" >&2
+    exit 1
+}
 
 
 # 现有vm
@@ -163,7 +166,7 @@ do
             VM_LIST=$2
             shift 2
             if [ ! -f "${VM_LIST}" ]; then
-                echo -e "\n峰哥说：文件【${VM_LIST}】不存在，请检查！\n"
+                echo -e "\n猪猪侠警告：文件【${VM_LIST}】不存在，请检查！\n"
                 exit 1
             fi
             ;;
@@ -184,7 +187,7 @@ do
             break
             ;;
         *)
-            echo -e "\n峰哥说：未知参数，请查看帮助【$0 --help】\n"
+            echo -e "\n猪猪侠警告：未知参数，请查看帮助【$0 --help】\n"
             exit 1
             ;;
     esac
@@ -195,7 +198,7 @@ case "${VM_LIST_FROM}" in
     arg)
         ARG_NUM=$#
         if [ ${ARG_NUM} -eq 0 ]; then
-            echo -e "\n峰哥说：缺少参数，请查看帮助！\n"
+            echo -e "\n猪猪侠警告：缺少参数，请查看帮助！\n"
             exit 2
         fi
         for ((i=1;i<=ARG_NUM;i++))
@@ -204,7 +207,7 @@ case "${VM_LIST_FROM}" in
             shift
             # 匹配？
             if [ `F_SEARCH_EXISTED_VM "${VM_NAME}" > /dev/null; echo $?` -ne 0 ]; then
-                echo -e "\n峰哥说：虚拟机【${VM_NAME}】没找到，跳过！\n"
+                echo -e "\n猪猪侠警告：虚拟机【${VM_NAME}】没找到，跳过！\n"
                 continue
             fi
             #
@@ -231,7 +234,7 @@ case "${VM_LIST_FROM}" in
             VM_NAME=`echo $VM_NAME`
             # 匹配？
             if [ `F_SEARCH_EXISTED_VM "${VM_NAME}" > /dev/null; echo $?` -ne 0 ]; then
-                echo -e "\n峰哥说：虚拟机【${VM_NAME}】没找到，跳过！\n"
+                echo -e "\n猪猪侠警告：虚拟机【${VM_NAME}】没找到，跳过！\n"
                 continue
             fi
             #

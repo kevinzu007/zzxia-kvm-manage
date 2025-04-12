@@ -1,6 +1,6 @@
 #!/bin/bash
 # 修改人：猪猪侠
-# Test On: CentOS 7
+# Test On: Rocky Linux 9
 #
 # 原作者信息如下：
 # https://blog.csdn.net/virnet/article/details/76273512

@@ -113,15 +113,17 @@ EOF
 
 
 
-
 # 参数检查
-TEMP=$(getopt -o hq  -l help,quiet -- "$@")
-if [ $? != 0 ]; then
-    echo -e "\n猪猪侠警告：参数不合法，请查看帮助【$0 --help】\n"
+TEMP=$(getopt -o hq  -l help,quiet -- "$@") || {
+    echo -e "\n猪猪侠警告：参数不合法，请查看帮助【$0 --help】\n" >&2
     exit 1
-fi
+}
 #
-eval set -- "${TEMP}"
+eval set -- "${TEMP}" || {
+    echo -e "\n猪猪侠警告：参数设置失败！\n" >&2
+    exit 1
+}
+
 
 
 while true
@@ -307,10 +309,10 @@ do
     fi
     #
     # CPU、MEM
-    virsh setmaxmem ${VM_NAME} ${VM_MEM}G  --config     #-- 以GiB 为单位，设置最大内存
-    virsh setmem    ${VM_NAME} ${VM_MEM}G  --config     #-- 设置启动内存
-    virsh setvcpus  ${VM_NAME} ${VM_CPU}   --config --maximum  #-- 设置最大cpu
-    virsh setvcpus  ${VM_NAME} ${VM_CPU}   --current    #-- 设置启动数量
+    virsh setmaxmem "${VM_NAME}" "${VM_MEM}G"  --config     #-- 以GiB 为单位，设置最大内存
+    virsh setmem    "${VM_NAME}" "${VM_MEM}G"  --config     #-- 设置启动内存
+    virsh setvcpus  "${VM_NAME}" "${VM_CPU}"   --config --maximum  #-- 设置最大cpu
+    virsh setvcpus  "${VM_NAME}" "${VM_CPU}"   --current    #-- 设置启动数量
     #
     # 修改xml for 网卡及其他
     F_GEN_SED_SH="/tmp/${SH_NAME}-xml-sed.sh"
