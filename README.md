@@ -62,14 +62,13 @@ export QUIET='no'     #--- yes|no
 export KVM_XML_PATH='/etc/libvirt/qemu'                 #-- KVM虚拟XML配置文件路径（CENTOS下XML的默认路径，如果是UBUNTU，请修改）
 
 # 模板虚拟机参数
-export TEMPLATE_VM_ROOT_VOLUME='/dev/mapper/cl-root'                                  #-- 模板虚拟机中挂载到【/】的卷，可以是逻辑卷【例如：/dev/mapper/cl-root】，也可以是普通磁盘分区【例如：
 /dev/sda1】
-export TEMPLATE_VM_NET_CONF_FILE_CENTOS='/etc/sysconfig/network-scripts/ifcfg-eth0'   #-- 模板虚拟机CentOS系统内的网卡配置文件
+export VM_NIC_CONF_FILE='/etc/sysconfig/network-scripts/ifcfg-eth0'   #-- 模板虚拟机CentOS系统内的网卡配置文件
 
 # 新虚拟机默认参数，特殊值可以在【my_vm.list】中指定
 export VM_DEFAULT_DNS='192.168.11.3,192.168.11.4'      #-- 默认DNS，最多两个DNS服务器，中间用【,】分隔，不要有空格
 export VM_DEFAULT_DOMAIN='zjlh.lan'                    #-- 默认域名
-export VM_DEFAULT_IMG_PATH='/var/lib/libvirt/images'   #-- 虚拟机磁盘文件默认路径
+export VM_DEFAULT_DISK_IMG_PATH='/var/lib/libvirt/images'   #-- 虚拟机磁盘文件默认路径
 ```
 
 ### 4.2 虚拟机列表文件`my_vm.list`

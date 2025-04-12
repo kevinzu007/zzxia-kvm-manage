@@ -1,8 +1,8 @@
 #!/bin/bash
 #############################################################################
-# Create By: zhf_sy
+# Create By: 猪猪侠
 # License: GNU GPLv3
-# Test On: CentOS 7
+# Test On: Rocky Linux 9
 #############################################################################
 
 
@@ -65,8 +65,8 @@ F_HELP()
 }
 
 
-# 用法：F_VM_SEARCH 虚拟机名
-F_VM_SEARCH ()
+# 用法：F_SEARCH_EXISTED_VM 虚拟机名
+F_SEARCH_EXISTED_VM ()
 {
     FS_VM_NAME=$1
     GET_IT='NO'
@@ -78,7 +78,7 @@ F_VM_SEARCH ()
             GET_IT='YES'
             break
         fi
-    done < ${VM_LIST_ONLINE}
+    done < ${VM_LIST_EXISTED}
     #
     if [ "${GET_IT}" = 'YES' ]; then
         echo -e "${F_VM_STATUS}"
@@ -91,18 +91,20 @@ F_VM_SEARCH ()
 
 
 # 参数检查
-TEMP=`getopt -o hlsaf:SA  -l help,list,start,autostart,file:,select,ARG -- "$@"`
-if [ $? != 0 ]; then
-    echo -e "\n峰哥说：参数不合法，请查看帮助【$0 --help】\n"
+TEMP=$(getopt -o hlsaf:SA  -l help,list,start,autostart,file:,select,ARG -- "$@") || {
+    echo -e "\n猪猪侠警告：参数不合法，请查看帮助【$0 --help】\n" >&2
     exit 1
-fi
+}
 #
-eval set -- "${TEMP}"
+eval set -- "${TEMP}" || {
+    echo -e "\n猪猪侠警告：参数设置失败！\n" >&2
+    exit 1
+}
 
 
 # 现有vm
-VM_LIST_ONLINE="/tmp/${SH_NAME}-vm.list.online"
-virsh list --all | sed  '1,2d;s/[ ]*//;/^$/d'  > ${VM_LIST_ONLINE}
+VM_LIST_EXISTED="/tmp/${SH_NAME}-vm.list.online"
+virsh list --all | sed  '1,2d;s/[ ]*//;/^$/d'  > ${VM_LIST_EXISTED}
 
 
 VM_START='no'
@@ -118,9 +120,9 @@ do
         -l|--list)
             echo  "KVM虚拟机清单："
             #echo "---------------------------------------------"
-            #awk '{printf "%3s : %-40s %s %s\n", NR, $2,$3,$4}'  ${VM_LIST_ONLINE}
+            #awk '{printf "%3s : %-40s %s %s\n", NR, $2,$3,$4}'  ${VM_LIST_EXISTED}
             #echo "---------------------------------------------"
-            awk '{printf "%s,%s %s\n", $2,$3,$4}'  ${VM_LIST_ONLINE} > /tmp/vm.list
+            awk '{printf "%s,%s %s\n", $2,$3,$4}'  ${VM_LIST_EXISTED} > /tmp/vm.list
             ${SH_PATH}/format_table.sh  -d ','  -t 'NAME,STATUS'  -f /tmp/vm.list
             exit
             ;;
@@ -137,7 +139,7 @@ do
             VM_LIST=$2
             shift 2
             if [ ! -f "${VM_LIST}" ]; then
-                echo -e "\n峰哥说：文件【${VM_LIST}】不存在，请检查！\n"
+                echo -e "\n猪猪侠警告：文件【${VM_LIST}】不存在，请检查！\n"
                 exit 1
             fi
             ;;
@@ -154,7 +156,7 @@ do
             break
             ;;
         *)
-            echo -e "\n峰哥说：未知参数，请查看帮助【$0 --help】\n"
+            echo -e "\n猪猪侠警告：未知参数，请查看帮助【$0 --help】\n"
             exit 1
             ;;
     esac
@@ -165,7 +167,7 @@ case "${VM_LIST_FROM}" in
     arg)
         ARG_NUM=$#
         if [ ${ARG_NUM} -eq 0 ]; then
-            echo -e "\n峰哥说：缺少参数，请查看帮助！\n"
+            echo -e "\n猪猪侠警告：缺少参数，请查看帮助！\n"
             exit 2
         fi
         for ((i=1;i<=ARG_NUM;i++))
@@ -173,8 +175,8 @@ case "${VM_LIST_FROM}" in
             VM_NAME=$1
             shift
             # 匹配？
-            if [ `F_VM_SEARCH "${VM_NAME}" > /dev/null; echo $?` -ne 0 ]; then
-                echo -e "\n峰哥说：虚拟机【${VM_NAME}】没找到，跳过！\n"
+            if [ `F_SEARCH_EXISTED_VM "${VM_NAME}" > /dev/null; echo $?` -ne 0 ]; then
+                echo -e "\n猪猪侠警告：虚拟机【${VM_NAME}】没找到，跳过！\n"
                 continue
             fi
             #
@@ -195,8 +197,8 @@ case "${VM_LIST_FROM}" in
             VM_NAME=`echo $LINE | cut -f 2 -d '|'`
             VM_NAME=`echo $VM_NAME`
             # 匹配？
-            if [ `F_VM_SEARCH "${VM_NAME}" > /dev/null; echo $?` -ne 0 ]; then
-                echo -e "\n峰哥说：虚拟机【${VM_NAME}】没找到，跳过！\n"
+            if [ `F_SEARCH_EXISTED_VM "${VM_NAME}" > /dev/null; echo $?` -ne 0 ]; then
+                echo -e "\n猪猪侠警告：虚拟机【${VM_NAME}】没找到，跳过！\n"
                 continue
             fi
             #
@@ -211,7 +213,7 @@ case "${VM_LIST_FROM}" in
     select)
         echo  "虚拟机清单："
         echo "---------------------------------------------"
-        awk '{printf "%c : %-40s %s %s\n", NR+96, $2,$3,$4}'  ${VM_LIST_ONLINE}
+        awk '{printf "%c : %-40s %s %s\n", NR+96, $2,$3,$4}'  ${VM_LIST_EXISTED}
         echo "---------------------------------------------"
         echo "请选择你想操作的虚拟机！"
         read -p "请输入（可以联系输入多个，不能有空格，如：def）："  ANSWER
@@ -224,7 +226,7 @@ case "${VM_LIST_FROM}" in
         for ((i=0;i<VM_SELECT_NUM;i++))
         do
             VM_SELECT_No=$(echo ${VM_SELECT_LIST:${i}:1})
-            VM_NAME=$(awk '{printf "%c : %-40s %s%s\n", NR+96, $2,$3,$4}' ${VM_LIST_ONLINE} | awk '/'^${VM_SELECT_No}'/{print $3}')
+            VM_NAME=$(awk '{printf "%c : %-40s %s%s\n", NR+96, $2,$3,$4}' ${VM_LIST_EXISTED} | awk '/'^${VM_SELECT_No}'/{print $3}')
             #
             if [ "${VM_START}" = 'yes' ]; then
                 virsh start  ${VM_NAME}
