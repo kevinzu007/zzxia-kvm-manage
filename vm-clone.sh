@@ -153,7 +153,7 @@ done
 
 
 # 待搜索的服务清单
-true> "${VM_LIST_TMP}"
+:> "${VM_LIST_TMP}"
 # 参数个数为
 if [[ $# -eq 0 ]]; then
     cp  "${VM_LIST}"  "${VM_LIST_TMP}"
@@ -261,7 +261,7 @@ do
     echo 
     KVM_LIBVIRT_URL="qemu+ssh://${KVM_SSH_USER}@${KVM_SSH_HOST}:${KVM_SSH_PORT}/system"
     #
-    true> "${VM_LIST_EXISTED}"
+    :> "${VM_LIST_EXISTED}"
     if ! virsh --connect "${KVM_LIBVIRT_URL}" list --all > "${VM_LIST_EXISTED}"; then
         echo -e "\n\033[31m猪猪侠警告：连接KVM宿主机失败，请检查以下问题：\033[0m"
         echo -e "1. libvirt服务是否运行？(systemctl status libvirtd)"
@@ -292,10 +292,11 @@ do
     fi
     #
     # clone
+    echo "开始 virt-clone ......"
     #
     VM_CLONE_LOG_FILE="${LOG_HOME}/${SH_NAME}-clone.log--${VM_NAME}"
-    true> "${VM_CLONE_LOG_FILE}"
-    virt-clone  --connect "${KVM_LIBVIRT_URL}"  \
+    :> "${VM_CLONE_LOG_FILE}"
+    time virt-clone  --connect "${KVM_LIBVIRT_URL}"  \
         -o "${VM_CLONE_TEMPLATE}"  \
         -n "${VM_NAME}"  \
         -f "${VM_DISK_IMG_PATH}/${VM_IMG}"  | tee "${VM_CLONE_LOG_FILE}" 2>&1
@@ -306,8 +307,10 @@ do
     fi
     #
     # CPU、MEM
-    virsh setvcpus  ${VM_NAME} ${VM_CPU}   --config
-    virsh setmem    ${VM_NAME} ${VM_MEM}G  --config     #-- 以GiB 为单位
+    virsh setmaxmem ${VM_NAME} ${VM_MEM}G  --config     #-- 以GiB 为单位，设置最大内存
+    virsh setmem    ${VM_NAME} ${VM_MEM}G  --config     #-- 设置启动内存
+    virsh setvcpus  ${VM_NAME} ${VM_CPU}   --config --maximum  #-- 设置最大cpu
+    virsh setvcpus  ${VM_NAME} ${VM_CPU}   --current    #-- 设置启动数量
     #
     # 修改xml for 网卡及其他
     F_GEN_SED_SH="/tmp/${SH_NAME}-xml-sed.sh"
@@ -318,6 +321,7 @@ do
     ssh  -p "${KVM_SSH_PORT}"  "${KVM_SSH_USER}"@"${KVM_SSH_HOST}"  < /dev/null  "bash ${F_GEN_SED_SH}  &&  virsh define ${KVM_XML_PATH}/${VM_XML}"
     #
     # vm Modify
+    echo "开始 vm-modify.sh ......"
     bash  "${VM_MODIFY_SH}"  --quiet  "${VM_NAME}"
     #
 done < "${VM_LIST_TMP}"

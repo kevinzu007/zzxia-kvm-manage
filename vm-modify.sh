@@ -99,15 +99,15 @@ VIRT_RUN_SH ()
 {
     cat << EOF
 #!/bin/bash
-#
-## 换机器id
-rm -f /etc/machine-id
-systemd-machine-id-setup
-## 换ssh_host_key
-rm -f /etc/ssh/ssh_host_*
-/usr/libexec/openssh/sshd-keygen ecdsa
-/usr/libexec/openssh/sshd-keygen ed25519
-/usr/libexec/openssh/sshd-keygen rsa
+# 这些改用 virt-sysprep 实现
+# ## 换机器id
+# :> /etc/machine-id       #-- 如果rm -f /etc/machine-id，且没有运行 systemd-machine-id-setup 则会出现问题，特别是网络部分
+# systemd-machine-id-setup
+# ## 换ssh_host_key
+# rm -f /etc/ssh/ssh_host_*
+# /usr/libexec/openssh/sshd-keygen ecdsa
+# /usr/libexec/openssh/sshd-keygen ed25519
+# /usr/libexec/openssh/sshd-keygen rsa
 #
 ## hosts
 sed -i '/localhost/!d' /etc/hosts
@@ -125,7 +125,7 @@ VIRT_FIRSTBOOT_SH ()
 # 注意：函数内部的变量必须转义
 #
 VIRT_FIRSTBOOT_SH_LOG="/var/log/${SH_NAME}-VIRT_FIRSTBOOT_SH.log"
-true > \${VIRT_FIRSTBOOT_SH_LOG}
+:> \${VIRT_FIRSTBOOT_SH_LOG}
 #
 ## 网卡
 # 动态检测第一个非回环接口
@@ -197,7 +197,7 @@ done
 
 
 # 待搜索的服务清单
-true > "${VM_LIST_APPEND_1_TMP}"
+:> "${VM_LIST_APPEND_1_TMP}"
 # 参数个数为
 if [[ $# -eq 0 ]]; then
     cp  "${VM_LIST_APPEND_1}"  "${VM_LIST_APPEND_1_TMP}"
@@ -325,7 +325,7 @@ do
     #
     KVM_LIBVIRT_URL="qemu+ssh://${KVM_SSH_USER}@${KVM_SSH_HOST}:${KVM_SSH_PORT}/system"
     #
-    true> "${VM_LIST_EXISTED}"
+    :> "${VM_LIST_EXISTED}"
     if ! virsh --connect "${KVM_LIBVIRT_URL}" list --all > "${VM_LIST_EXISTED}"; then
         echo -e "\n\033[31m猪猪侠警告：连接KVM宿主机失败，请检查以下问题：\033[0m"
         echo -e "1. libvirt服务是否运行？(systemctl status libvirtd)"
@@ -358,7 +358,7 @@ do
     ### virt-sysprep
     echo "开始 virt-sysprep ......"
     #
-    #virt-sysprep -d "${VM_NAME}" --enable machine-id,machine-id
+    time virt-sysprep -d "${VM_NAME}" --enable machine-id,ssh-hostkeys
     #
     ### virt-customize
     echo "开始 virt-customize ......"
@@ -371,9 +371,9 @@ do
     chmod +x ${VIRT_FIRSTBOOT_SH_FILE}
     #
     VIRT_CUSTOMIZE_LOG_FILE="${LOG_HOME}/${SH_NAME}-virt-customize.log--${VM_NAME}"
-    true> "${VIRT_CUSTOMIZE_LOG_FILE}"
+    :> "${VIRT_CUSTOMIZE_LOG_FILE}"
     #
-    virt-customize  \
+    time virt-customize  \
         --connect "${KVM_LIBVIRT_URL}"  \
         --hostname "${VM_NAME}.${VM_DOMAIN}"  \
         --run ${VIRT_RUN_SH_FILE}  \
@@ -384,7 +384,6 @@ do
         echo -e "\n猪猪侠警告：【${VM_NAME}】virt-customize 出错，请检查！\n（检查方法：cat ${VIRT_CUSTOMIZE_LOG_FILE}）\n"
         exit 1
     fi
-    #
     #
 done < "${VM_LIST_APPEND_1_TMP}"
 
