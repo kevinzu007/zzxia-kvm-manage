@@ -1,15 +1,15 @@
 #!/bin/bash
 #############################################################################
-# Create By: zhf_sy
+# Create By: 猪猪侠
 # License: GNU GPLv3
-# Test On: CentOS 7
+# Test On: Rocky Linux 9
 #############################################################################
 
 
 # sh
 SH_NAME=${0##*/}
 SH_PATH=$( cd "$( dirname "$0" )" && pwd )
-cd ${SH_PATH}
+cd "${SH_PATH}" || exit 1
 
 
 
@@ -46,15 +46,15 @@ fi
 
 
 # 现有vm
-VM_LIST_ONLINE="/tmp/${SH_NAME}-vm.list.online"
-virsh list --all | sed  '1,2d;s/[ ]*//;/^$/d'  > ${VM_LIST_ONLINE}
+VM_LIST_EXISTED="/tmp/${SH_NAME}-vm.list.online"
+virsh list --all | sed  '1,2d;s/[ ]*//;/^$/d'  > ${VM_LIST_EXISTED}
 
 
 echo  "KVM虚拟机清单："
 #echo "---------------------------------------------"
-#awk '{printf "%3s : %-40s %s %s\n", NR, $2,$3,$4}'  ${VM_LIST_ONLINE}
+#awk '{printf "%3s : %-40s %s %s\n", NR, $2,$3,$4}'  ${VM_LIST_EXISTED}
 #echo "---------------------------------------------"
-awk '{printf "%s,%s %s\n", $2,$3,$4}'  ${VM_LIST_ONLINE} > /tmp/vm.list
+awk '{printf "%s,%s %s\n", $2,$3,$4}'  ${VM_LIST_EXISTED} > /tmp/vm.list
 ${SH_PATH}/format_table.sh  -d ','  -t 'NAME,STATUS'  -f /tmp/vm.list
 
 

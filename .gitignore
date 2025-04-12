@@ -11,3 +11,12 @@
 
 # .nfs files are created when an open file is removed but is still being accessed
 .nfs*
+
+
+## zzixa
+kvm.env
+my_vm.list
+my_vm.list.append.1
+
+
+

@@ -1,6 +1,6 @@
 #!/bin/bash
-# 修改人：zhf_sy
-# Test On: CentOS 7
+# 修改人：猪猪侠
+# Test On: Rocky Linux 9
 #
 # 原作者信息如下：
 # https://blog.csdn.net/virnet/article/details/76273512
@@ -47,6 +47,7 @@ F_HELP()
     用途：将数据输出为表格
     依赖：
     注意：
+        * 输入命令时，参数顺序不分先后
     用法:
         $0 [-h|--help]
         $0 <-d|--delimeter {分隔符}>  <-t|--title {字段名1, 字段名2, ...}>  <-r|--row {值1, 值2, ...}>  <-f|--file {文件x}    #--- 默认分隔符为【,】
@@ -191,8 +192,8 @@ function output_table(){
 
 # 示例2：
 #set_title 项目 状态
-#append_line  gclife-renewal-front*  "Build 成功(*)"
-#append_line  gclife-renewal-front  "Build(*) 成功"
+#append_line  gc-renewal-front*  "Build 成功(*)"
+#append_line  gc-renewal-front  "Build(*) 成功"
 #output_table
 
 
@@ -201,8 +202,7 @@ function output_table(){
 # 参数检查
 TEMP=`getopt  -o hd:t:r:f:  -l help,delimeter:,title:,row:,file: -- "$@"`
 if [ $? != 0 ]; then
-    echo "参数不合法，退出"
-    F_HELP
+    echo -e "\n猪猪侠警告：参数不合法，请查看帮助【$0 --help】\n"
     exit 1
 fi
 #
@@ -294,7 +294,7 @@ do
             ;;
         -r|--row)
             if [ -z "${T_TITLE}" ]; then
-                echo -e "\n峰哥说：你还没设置标题呢！\n"
+                echo -e "\n猪猪侠警告：你还没设置标题呢！\n"
                 exit 1
             fi
             T_ROW="$2"
@@ -321,7 +321,7 @@ do
             break
             ;;
         *)
-            echo -e "\n峰哥说：参数错误\n"
+            echo -e "\n猪猪侠警告：未知参数，请查看帮助【$0 --help】\n"
             exit 1
             ;;
     esac
