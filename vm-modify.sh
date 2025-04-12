@@ -100,9 +100,14 @@ VIRT_RUN_SH ()
     cat << EOF
 #!/bin/bash
 #
-## 清理指纹
+## 换机器id
 rm -f /etc/machine-id
+systemd-machine-id-setup
+## 换ssh_host_key
 rm -f /etc/ssh/ssh_host_*
+/usr/libexec/openssh/sshd-keygen ecdsa
+/usr/libexec/openssh/sshd-keygen ed25519
+/usr/libexec/openssh/sshd-keygen rsa
 #
 ## hosts
 sed -i '/localhost/!d' /etc/hosts
@@ -335,7 +340,7 @@ do
     #
     VM_STATUS=$(F_SEARCH_EXISTED_VM  "${VM_NAME}")
     if [[ -z ${VM_STATUS} ]]; then
-        echo -e "\n猪猪侠警告：虚拟机【${VM_NAME}】不存在存在，跳过\n"
+        echo -e "\n猪猪侠警告：虚拟机【${VM_NAME}】不存在，跳过\n"
         exit 1
     elif [[ ${VM_STATUS} =~ 'running'|'运行' ]]; then
         echo -e "\n猪猪侠警告：虚拟机【${VM_NAME}】正在运行中，请先停止，退出\n"
@@ -350,8 +355,13 @@ do
 #    VM_OS_PRETTY_NAME=$(cat ${VM_OS_RELEASE_FILE}  |  grep -E ^PRETTY_NAME=  |  cut -d '"' -f 2)
     #
     #
-    ### virt-customize
+    ### virt-sysprep
+    echo "开始 virt-sysprep ......"
     #
+    #virt-sysprep -d "${VM_NAME}" --enable machine-id,machine-id
+    #
+    ### virt-customize
+    echo "开始 virt-customize ......"
     #
     VIRT_RUN_SH_FILE="${LOG_HOME}/virt-customize-run-script.sh"
     VIRT_RUN_SH  > ${VIRT_RUN_SH_FILE}

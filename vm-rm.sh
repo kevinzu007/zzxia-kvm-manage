@@ -116,7 +116,7 @@ F_RM_VM ()
                 rm  -f "${IMG_FILE}"
                 echo 'OK，已删除'
             else
-                echo -e "\n超时，跳过\n"
+                echo -e "\nOK，跳过\n"
             fi
         fi
     done

@@ -317,7 +317,7 @@ do
     #重新define虚拟机
     ssh  -p "${KVM_SSH_PORT}"  "${KVM_SSH_USER}"@"${KVM_SSH_HOST}"  < /dev/null  "bash ${F_GEN_SED_SH}  &&  virsh define ${KVM_XML_PATH}/${VM_XML}"
     #
-    # vm sysprep
+    # vm Modify
     bash  "${VM_MODIFY_SH}"  --quiet  "${VM_NAME}"
     #
 done < "${VM_LIST_TMP}"
