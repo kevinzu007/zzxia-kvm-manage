@@ -102,39 +102,28 @@ get_vm_disk_path() {
     # 获取磁盘配置XML片段
     disk_xml=$(virsh dumpxml "$vm_name" | xmllint --xpath '/domain/devices/disk[@device="disk"][1]/source' - 2>/dev/null || true)
 
-    # 解析不同类型存储
+    # 解析不同类型存储（移除函数内的LOG调用）
     if [[ "$disk_xml" =~ file=\"([^\"]+)\" ]]; then
-        # 常规文件存储
         disk_path="${BASH_REMATCH[1]}"
-        LOG "检测到文件存储: ${disk_path}"
     elif [[ "$disk_xml" =~ dev=\"([^\"]+)\" ]]; then
-        # 块设备存储
         disk_path="${BASH_REMATCH[1]}"
-        LOG "检测到块设备: ${disk_path}"
     elif [[ "$disk_xml" =~ name=\"([^\"]+)\" ]]; then
-        # RBD/网络存储
         if [[ "$disk_xml" =~ protocol=\"rbd\" ]]; then
-            # RBD存储
             local pool=$(virsh dumpxml "$vm_name" | xmllint --xpath 'string(/domain/devices/disk[@device="disk"][1]/source/@pool)' - 2>/dev/null || true)
             disk_path="rbd:${pool}/${BASH_REMATCH[1]}"
-            LOG "检测到RBD存储: ${disk_path}"
         elif [[ "$disk_xml" =~ protocol=\"iscsi\" ]]; then
-            # iSCSI存储
             disk_path="iscsi:${BASH_REMATCH[1]}"
-            LOG "检测到iSCSI存储: ${disk_path}"
         else
-            # 其他网络存储
             disk_path="net:${BASH_REMATCH[1]}"
-            LOG "检测到网络存储: ${disk_path}"
         fi
     fi
 
-    # 备用方案：使用virsh domblklist
+    # 备用方案
     if [ -z "$disk_path" ]; then
-        WARN "XML解析失败，尝试使用domblklist获取磁盘路径"
         disk_path=$(virsh domblklist "$vm_name" --details | awk '
-            $2=="disk" && $3!="cdrom" && $4!~"^$" {print $4; exit}
+            $2=="disk" && $3!="cdrom" && $4!~"\.iso$" && $4!~"^$" {print $4; exit}
         ')
+        disk_path=$(echo "$disk_path" | xargs)  # 去除首尾空白字符
     fi
 
     # 验证结果
@@ -143,19 +132,17 @@ get_vm_disk_path() {
         exit 1
     fi
 
-    # 特殊存储类型检查
     if [[ "$disk_path" =~ ^(rbd:|iscsi:|net:) ]]; then
         ERROR "不支持的网络存储类型: ${disk_path}"
-        ERROR "请手动扩展存储后重试"
         exit 1
     fi
 
-    # 验证路径是否存在
     if [ ! -f "$disk_path" ] && [[ ! "$disk_path" =~ ^/dev/ ]]; then
         ERROR "磁盘路径不存在或不是有效设备: ${disk_path}"
         exit 1
     fi
 
+    # 只返回纯净的磁盘路径
     echo "$disk_path"
 }
 
@@ -173,7 +160,7 @@ F_LIST_VMS() {
 # 检查虚拟机磁盘信息
 F_CHECK_DISK() {
     local vm_name="$1"
-    
+
     if ! virsh dominfo "$vm_name" &>/dev/null; then
         ERROR "虚拟机 ${vm_name} 不存在！"
         exit 1
@@ -181,9 +168,10 @@ F_CHECK_DISK() {
 
     LOG "虚拟机 ${vm_name} 磁盘信息："
     virsh domblklist "$vm_name"
-    
+
     LOG "磁盘详细信息："
     local disk_path=$(get_vm_disk_path "$vm_name")
+    LOG "检测到磁盘路径: ${disk_path}"  # 将日志移到这里
     qemu-img info "$disk_path"
 }
 
