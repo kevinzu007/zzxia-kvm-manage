@@ -186,6 +186,26 @@ F_CHECK_DISK() {
     LOG "=============================================="
 }
 
+# 获取虚拟机内文件系统信息
+get_vm_fs_info() {
+    local disk_path="$1"
+    local target_part="$2"
+
+    # 使用virt-filesystems获取精确信息
+    local fs_info=$(virt-filesystems --format=qcow2 -a "$disk_path" --long -h | grep "$target_part")
+
+    # 提取文件系统类型和挂载点
+    local fs_type=$(echo "$fs_info" | awk '{print $2}')
+    local mount_point=$(echo "$fs_info" | awk '{print $1}')
+
+    # 如果没有挂载点，尝试通过blkid获取类型
+    if [[ -z "$fs_type" ]]; then
+        fs_type=$(virt-customize -a "$disk_path" --run-command "blkid -o value -s TYPE $target_part 2>/dev/null" | tail -1)
+    fi
+
+    echo "$fs_type $mount_point"
+}
+
 # 单位转换函数
 human_size() {
     local bytes=$1
@@ -243,7 +263,7 @@ F_EXPAND_DISK() {
         exit 1
     fi
     
-    # 获取当前磁盘大小（自适应单位）
+    # 获取当前磁盘大小
     local current_size_bytes=$(qemu-img info "$disk_path" | awk -F'[ ()]' '/virtual size/ {print $6}')
     
     # 计算新大小（保持GB单位用于计算）
@@ -301,25 +321,47 @@ F_EXPAND_DISK() {
     # 替换原磁盘文件
     mv "$temp_disk" "$disk_path"
     
-    # 3. 调整文件系统
-    LOG "[3/3] 正在调整文件系统..."
-    
-    # 检查文件系统类型
-    local fs_type=$(virt-filesystems --format=qcow2 -a "$disk_path" --filesystem-type | grep "$target_part" | awk '{print $2}')
-    
+    # 3. 调整文件系统（自动检测类型）
+    LOG "[3/3] 正在检测并调整文件系统..."
+
+    # 获取文件系统信息
+    read fs_type mount_point <<< $(get_vm_fs_info "$disk_path" "$target_part")
+
+    if [[ -z "$fs_type" ]]; then
+        WARN "无法自动检测文件系统类型，请手动处理！"
+        WARN "可能需要登录虚拟机执行以下命令之一："
+        WARN "  resize2fs $target_part    # 对于ext2/3/4"
+        WARN "  xfs_growfs $mount_point   # 对于XFS"
+        exit 1
+    fi
+
     case "$fs_type" in
         ext*)
-            LOG "检测到ext文件系统，使用resize2fs..."
-            virt-customize -a "$disk_path" --run-command "resize2fs ${target_part}"
+            LOG "检测到${fs_type}文件系统，挂载点: ${mount_point:-未挂载}"
+            if [[ -n "$mount_point" ]]; then
+                virt-customize -a "$disk_path" --run-command "resize2fs $target_part"
+            else
+                WARN "分区未挂载，建议启动虚拟机后执行: resize2fs $target_part"
+            fi
             ;;
         xfs)
-            LOG "检测到XFS文件系统，使用xfs_growfs..."
-            virt-customize -a "$disk_path" --run-command "xfs_growfs ${target_part}"
+            LOG "检测到XFS文件系统，挂载点: ${mount_point:-未挂载}"
+            if [[ -n "$mount_point" ]]; then
+                virt-customize -a "$disk_path" --run-command "xfs_growfs $mount_point"
+            else
+                WARN "分区未挂载，建议启动虚拟机后执行: xfs_growfs $target_part"
+            fi
+            ;;
+        swap)
+            LOG "检测到SWAP分区，无需调整"
             ;;
         *)
-            WARN "未知文件系统类型 ${fs_type}，请手动调整！"
+            WARN "不支持的文件系统类型: ${fs_type}"
+            WARN "需要手动处理该文件系统的扩容"
+            exit 1
             ;;
     esac
+    
     
     LOG "=============================================="
     LOG "操作成功完成！"
