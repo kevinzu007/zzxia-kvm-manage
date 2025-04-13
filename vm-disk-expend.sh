@@ -186,6 +186,17 @@ F_CHECK_DISK() {
     LOG "=============================================="
 }
 
+# 单位转换函数
+human_size() {
+    local bytes=$1
+    # 转换为TB (1TB = 1024^4 bytes)
+    if (( bytes >= 1099511627776 )); then  # 1TB = 1024^4
+        echo "$(echo "scale=1; $bytes / (1024^4)" | bc | awk '{printf "%.1fTB", $1}')"
+    # 转换为GB (1GB = 1024^3 bytes)
+    else
+        echo "$(echo "scale=1; $bytes / (1024^3)" | bc | awk '{printf "%.1fGB", $1}')"
+    fi
+}
 
 # 扩展虚拟机磁盘
 F_EXPAND_DISK() {
@@ -223,10 +234,20 @@ F_EXPAND_DISK() {
         exit 1
     fi
     
-    # 获取当前磁盘大小(GB)
+    # 获取当前磁盘大小（自适应单位）
     local current_size_bytes=$(qemu-img info "$disk_path" | awk -F'[ ()]' '/virtual size/ {print $5}')
-    local current_size_gb=$(echo "scale=1; $current_size_bytes / (1024^3)" | bc)
+    local current_size_display=$(human_size $current_size_bytes)
     
+    # 计算新大小（保持GB单位用于计算）
+    local current_size_gb=$(echo "scale=1; $current_size_bytes / (1024^3)" | bc)
+    local new_size_gb=$(echo "$current_size_gb + $add_size_gb" | bc)
+    local new_size_display=$(human_size $(echo "$new_size_gb * (1024^3)" | bc))
+    
+    # 显示带单位的容量信息
+    LOG "当前磁盘大小:    $current_size_display"
+    LOG "扩展大小:        +${add_size_gb}G"
+    LOG "新磁盘大小:      $new_size_display"
+
     # 显示操作信息
     if [ "$quiet" != "yes" ]; then
         LOG "=============================================="
