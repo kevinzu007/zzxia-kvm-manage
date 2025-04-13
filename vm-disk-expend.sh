@@ -224,8 +224,8 @@ F_EXPAND_DISK() {
     fi
     
     # 获取当前磁盘大小(GB)
-    local current_size_gb=$(qemu-img info "$disk_path" | grep "virtual size" | awk '{print $4}' | tr -d '()' | awk -F'G' '{print $1}')
-    local new_size_gb=$((current_size_gb + add_size_gb))
+    local current_size_bytes=$(qemu-img info "$disk_path" | awk -F'[ ()]' '/virtual size/ {print $5}')
+    local current_size_gb=$(echo "scale=1; $current_size_bytes / (1024^3)" | bc)
     
     # 显示操作信息
     if [ "$quiet" != "yes" ]; then
