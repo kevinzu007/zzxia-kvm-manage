@@ -171,9 +171,21 @@ F_CHECK_DISK() {
 
     LOG "磁盘详细信息："
     local disk_path=$(get_vm_disk_path "$vm_name")
-    LOG "检测到磁盘路径: ${disk_path}"  # 将日志移到这里
+    LOG "检测到磁盘路径: ${disk_path}"
     qemu-img info "$disk_path"
+
+    # 新增磁盘健康检查
+    LOG "开始磁盘健康检查..."
+    local check_result=$(qemu-img check "$disk_path" 2>&1)
+    if [[ "$check_result" =~ "No errors found" ]]; then
+        LOG "磁盘健康状态: ${GREEN}正常${NC}"
+    else
+        WARN "磁盘健康检查结果："
+        echo "$check_result"
+    fi
+    LOG "=============================================="
 }
+
 
 # 扩展虚拟机磁盘
 F_EXPAND_DISK() {
