@@ -5,6 +5,8 @@
 # Test On: Rocky Linux 9
 # Purpose: Add a new or existing qcow2 disk to a KVM virtual machine
 # Created Date: 2025-04-14
+# Updated By: Grok 3 (xAI)
+# Update Date: 2025-04-14
 #############################################################################
 
 # sh
@@ -14,7 +16,7 @@ cd ${SH_PATH}
 
 # 脚本名称和版本
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.0.0"
+VERSION="1.0.1"  # 更新版本号以反映修复
 
 # 颜色定义
 RED='\033[0;31m'
@@ -73,7 +75,7 @@ ${GREEN}用途：${NC}为KVM虚拟机添加新创建或现有的qcow2硬盘
 ${GREEN}支持操作：${NC}
     * 创建新qcow2硬盘（自动分区并格式化）
     * 添加现有qcow2硬盘
-${GREEN}支持存储类型：${NC}
+${GREEN}支持 => 支持存储类型：${NC}
     * 本地qcow2文件
 ${RED}不支持的类型：${NC}
     * raw格式磁盘
@@ -188,27 +190,36 @@ create_disk() {
     if ! qemu-img create -f qcow2 "$disk_path" "${size_gb}G"; then
         ERROR "创建硬盘 ${disk_path} 失败！"
     fi
-    TEMP_FILES+=("$disk_path")
 
     LOG "正在分区并格式化硬盘为 ${fs_type}..."
     if [ "$fs_type" = "ext4" ]; then
-        guestfish --rw -a "$disk_path" <<EOF
+        if ! guestfish --rw -a "$disk_path" <<EOF
 run
 part-disk /dev/sda mbr
 mkfs ext4 /dev/sda1
 EOF
+        then
+            rm -f "$disk_path"
+            ERROR "分区或格式化 ${disk_path} 失败！"
+        fi
     elif [ "$fs_type" = "xfs" ]; then
-        guestfish --rw -a "$disk_path" <<EOF
+        if ! guestfish --rw -a "$disk_path" <<EOF
 run
 part-disk /dev/sda mbr
 mkfs xfs /dev/sda1
 EOF
+        then
+            rm -f "$disk_path"
+            ERROR "分区或格式化 ${disk_path} 失败！"
+        fi
     else
+        rm -f "$disk_path"
         ERROR "不支持的文件系统类型: ${fs_type}"
     fi
 
-    if [ $? -ne 0 ]; then
-        ERROR "分区或格式化 ${disk_path} 失败！"
+    # 验证硬盘文件存在
+    if [ ! -f "$disk_path" ]; then
+        ERROR "硬盘文件 ${disk_path} 创建后未找到！"
     fi
 }
 
