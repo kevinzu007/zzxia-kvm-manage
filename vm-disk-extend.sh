@@ -14,7 +14,7 @@ cd ${SH_PATH}
 
 # 脚本名称和版本
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.1.0"
+VERSION="1.1.20250414"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -478,14 +478,20 @@ main() {
                 dry_run="yes"
                 ;;
             *)
-                if [ -z "$vm_name" ]; then
-                    vm_name="$1"
-                elif [ -z "$target_part" ]; then
-                    target_part="$1"
-                elif [ -z "$add_size_gb" ]; then
-                    add_size_gb="$1"
+                if [ "$action" = "extend" ]; then
+                    if [ -z "$vm_name" ]; then
+                        vm_name="$1"
+                    elif [ -z "$target_part" ]; then
+                        target_part="$1"
+                    elif [ -z "$add_size_gb" ]; then
+                        add_size_gb="$1"
+                    else
+                        ERROR "未知参数或参数过多：$1"
+                        F_HELP
+                        exit 1
+                    fi
                 else
-                    ERROR "未知参数或参数过多：$1"
+                    ERROR "未知参数：$1"
                     F_HELP
                     exit 1
                 fi
@@ -493,6 +499,13 @@ main() {
         esac
         shift
     done
+
+    # 检查操作类型
+    if [ -z "$action" ]; then
+        ERROR "请指定操作类型（如 -e|--extend 或 -c|--check）！"
+        F_HELP
+        exit 1
+    fi
 
     # 执行相应操作
     case "$action" in
@@ -511,7 +524,7 @@ main() {
             F_EXPAND_DISK "$vm_name" "$target_part" "$add_size_gb" "$force" "$QUIET" "$dry_run"
             ;;
         *)
-            ERROR "请指定操作类型（如 -e|--extend 或 -c|--check）！"
+            ERROR "未知操作类型！"
             F_HELP
             exit 1
             ;;
