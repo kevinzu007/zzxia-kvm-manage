@@ -344,8 +344,8 @@ F_EXPAND_DISK() {
     # 获取当前磁盘大小
     local disk_format=$(qemu-img info "$disk_path" | awk '/format:/ {print $3}')
     local current_size_bytes=$(qemu-img info "$disk_path" | awk -F'[ ()]' '/virtual size/ {print $6}')
-    local current_size_gb=$(echo "scale=1; $current_size_bytes / (1024^3)" | bc)
-    local new_size_gb=$(echo "$current_size_gb + $add_size_gb" | bc)
+    local current_size_gb=$(( current_size_bytes / 1024 / 1024 / 1024 ))  # 整数 GB
+    local new_size_gb=$(( current_size_gb + add_size_gb ))  # 整数加法
 
     # 检查临时磁盘空间
     local required_space=$(( new_size_gb * 1024 * 1024 * 1024 ))
