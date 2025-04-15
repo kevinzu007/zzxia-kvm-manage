@@ -5,7 +5,7 @@
 # Test On: Rocky Linux 9
 # Updated By: Grok 3 (xAI)
 # Update Date: 2025-04-15
-# Version: 1.1.3
+# Version: 1.1.4
 #############################################################################
 
 # sh
@@ -15,7 +15,7 @@ cd ${SH_PATH}
 
 # 脚本名称和版本
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.1.3"
+VERSION="1.1.4"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -402,8 +402,33 @@ F_EXPAND_DISK() {
         if [ "$dry_run" == "yes" ]; then
             WARN "[试运行] 将执行以下操作："
             LOG "1. 扩展磁盘文件: qemu-img resize \"${disk_path}\" \"+${add_size_gb}G\""
-            LOG "2. 调整分区表: virt-resize --expand \"${target_part}\" \"${disk_path}\" \"${disk_path}.resized\""
-            LOG "3. 启动虚拟机并调整文件系统（视情况手动执行）"
+            local resize_part="$target_part"
+            if [[ "$resize_part" =~ /dev/vd ]]; then
+                resize_part="${resize_part/vd/sd}"
+            fi
+            LOG "2. 调整分区表: virt-resize --expand \"${resize_part}\" \"${disk_path}\" \"${disk_path}.resized\""
+            LOG "3. 检测文件系统..."
+            read fs_type mount_point <<< $(get_vm_fs_info "$disk_path" "$target_part")
+            if [ -z "$fs_type" ]; then
+                LOG "   无法检测文件系统类型，将提示手动调整"
+            else
+                LOG "   检测到文件系统: ${fs_type}，挂载点: ${mount_point:-未挂载}"
+                case "$fs_type" in
+                    ext[234])
+                        LOG "   将执行: resize2fs ${target_part}"
+                        ;;
+                    xfs)
+                        LOG "   将执行: xfs_growfs ${mount_point:-/}"
+                        ;;
+                    swap)
+                        LOG "   SWAP 分区无需调整文件系统"
+                        ;;
+                    *)
+                        LOG "   不支持的文件系统类型: ${fs_type}，将提示手动调整"
+                        ;;
+                esac
+            fi
+            LOG "4. 启动虚拟机: virsh start ${vm_name}"
             LOG "=============================================="
             exit 0
         fi
