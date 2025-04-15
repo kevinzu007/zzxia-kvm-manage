@@ -326,7 +326,12 @@ F_EXPAND_DISK() {
 
     # 验证分区存在性
     local part_list=$(virt-filesystems -a "$disk_path" --partitions | grep -E "/dev/[sv]d[a-z][0-9]+")
-    if ! echo "$part_list" | grep -q "$target_part"; then
+    local check_part="$target_part"
+    if [[ "$check_part" =~ /dev/vd ]]; then
+        check_part="${check_part/vd/sd}"
+    fi
+    if ! echo "$part_list" | grep -q "$check_part"; then
+        WARN "可用分区：\n$part_list"
         ERROR "分区 ${target_part} 不存在于磁盘 ${disk_path}！"
     fi
 
