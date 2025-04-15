@@ -14,7 +14,7 @@ cd ${SH_PATH}
 
 # 脚本名称和版本
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.1.20250414"
+VERSION="1.1.4"  # 更新版本号以反映分区名简化
 
 # 颜色定义
 RED='\033[0;31m'
@@ -86,7 +86,7 @@ ${GREEN}注意：${NC}
     * 必须在虚拟机关机状态下操作（-f 强制模式仅用于特殊场景）
     * 重要数据请提前备份，脚本会提示备份
     * 需要root权限执行
-    * 分区命名支持 /dev/sdaX 或 /dev/vdaX
+    * 目标分区指定为 vda1、vdb1 等，脚本自动推断设备（如 vda、vdb）
 ${GREEN}参数语法规范：${NC}
     无包围符号 ：-a                : 必选【选项】
                ：val               : 必选【参数值】
@@ -113,68 +113,17 @@ ${GREEN}参数说明：${NC}
     -f|--force      强制在虚拟机运行时操作（仅扩展磁盘，需手动调整文件系统）
     -q|--quiet      安静模式，减少输出
     -d|--dry-run    试运行，只显示将要执行的操作
+    <目标分区>      目标分区（如 vda1、vdb1）
+    <扩展大小(GB)>  扩展的磁盘空间大小（单位：GB）
 ${GREEN}使用示例：${NC}
     $0 -h                          # 显示帮助信息
     $0 -l                          # 列出所有虚拟机
     $0 -c vm1                      # 检查【vm1】的磁盘信息
-    $0 -e vm1 /dev/vda2 10         # 扩展【vm1】的【/dev/vda2】分区【10GB】
-    $0 -e -f vm1 /dev/sda1 20      # 强制扩展（运行时，仅扩展磁盘）
-    $0 -e -d vm1 /dev/vda1 5       # 试运行扩展，不实际执行
+    $0 -e vm1 vda2 10              # 扩展【vm1】的【/dev/vda2】分区【10GB】
+    $0 -e vm1 vdb1 10              # 扩展【vm1】的【/dev/vdb1】分区【10GB】
+    $0 -e -f vm1 vda1 20           # 强制扩展（运行时，仅扩展磁盘）
+    $0 -e -d vm1 vdb1 5            # 试运行扩展，不实际执行
 "
-}
-
-# 获取虚拟机系统磁盘路径（支持所有存储类型）
-get_vm_disk_path() {
-    local vm_name="$1"
-    local disk_xml=""
-    local disk_path=""
-
-    # 获取磁盘配置XML片段
-    disk_xml=$(virsh dumpxml "$vm_name" 2>/dev/null | xmllint --xpath '/domain/devices/disk[@device="disk"][1]/source' - 2>/dev/null)
-
-    # 解析不同类型存储
-    if [[ "$disk_xml" =~ file=\"([^\"]+)\" ]]; then
-        disk_path="${BASH_REMATCH[1]}"
-    elif [[ "$disk_xml" =~ dev=\"([^\"]+)\" ]]; then
-        disk_path="${BASH_REMATCH[1]}"
-    elif [[ "$disk_xml" =~ name=\"([^\"]+)\" ]]; then
-        if [[ "$disk_xml" =~ protocol=\"rbd\" ]]; then
-            local pool=$(virsh dumpxml "$vm_name" 2>/dev/null | xmllint --xpath 'string(/domain/devices/disk[@device="disk"][1]/source/@pool)' - 2>/dev/null)
-            disk_path="rbd:${pool}/${BASH_REMATCH[1]}"
-        elif [[ "$disk_xml" =~ protocol=\"iscsi\" ]]; then
-            disk_path="iscsi:${BASH_REMATCH[1]}"
-        else
-            disk_path="net:${BASH_REMATCH[1]}"
-        fi
-    fi
-
-    # 备用方案
-    if [ -z "$disk_path" ]; then
-        disk_path=$(virsh domblklist "$vm_name" --details | awk '
-            $2=="disk" && $3!="cdrom" && $4!~"\.iso$" && $4!~"^$" {print $4; exit}
-        ')
-        disk_path=$(echo "$disk_path" | xargs)
-    fi
-
-    # 验证结果
-    if [ -z "$disk_path" ]; then
-        ERROR "无法获取虚拟机 ${vm_name} 的系统磁盘路径！"
-    fi
-
-    if [[ "$disk_path" =~ ^(rbd:|iscsi:|net:) ]]; then
-        ERROR "不支持的网络存储类型: ${disk_path}"
-    fi
-
-    if [ ! -e "$disk_path" ]; then
-        ERROR "磁盘路径不存在: ${disk_path}"
-    fi
-
-    # 检查是否可写
-    if [ ! -w "$disk_path" ]; then
-        ERROR "磁盘路径不可写: ${disk_path}"
-    fi
-
-    echo "$disk_path"
 }
 
 # 显示版本信息
@@ -188,137 +137,104 @@ F_LIST_VMS() {
     virsh list --all
 }
 
-# 检查虚拟机磁盘信息
+# 获取虚拟机磁盘路径
+get_vm_disk_path() {
+    local vm_name="$1"
+    local target_part="$2"  # 分区，如 vdb1
+    local device=""
+    local disk_path=""
+
+    # 解析分区名
+    if [[ "$target_part" =~ ^(vd[a-z])([0-9]+)$ ]]; then
+        device="${BASH_REMATCH[1]}"  # 提取 vdb
+    else
+        ERROR "分区名无效！请使用 vda1、vdb1 等格式。"
+    fi
+
+    # 获取虚拟机 XML
+    local xml
+    xml=$(virsh dumpxml "$vm_name" 2>/dev/null)
+    if [ -z "$xml" ]; then
+        ERROR "无法获取虚拟机 ${vm_name} 的配置信息！"
+    fi
+
+    # 提取设备名的磁盘路径
+    disk_path=$(echo "$xml" | xmllint --xpath "string(/domain/devices/disk[@device='disk']/source[@file][../target/@dev='$device']/@file)" - 2>/dev/null)
+    if [ -z "$disk_path" ]; then
+        ERROR "虚拟机 ${vm_name} 中未找到设备 ${device} 的磁盘文件！请检查分区名（可通过 virsh domblklist 查看）。"
+    fi
+
+    # 验证磁盘文件
+    if [ ! -f "$disk_path" ]; then
+        ERROR "磁盘文件 ${disk_path} 不存在！"
+    fi
+    if ! qemu-img info "$disk_path" | grep -q "format: qcow2"; then
+        ERROR "磁盘 ${disk_path} 不是 qcow2 格式！"
+    fi
+
+    echo "$disk_path"
+}
+
+# 检查虚拟机磁盘和分区信息
 F_CHECK_DISK() {
     local vm_name="$1"
-
+    check_root
     if ! virsh dominfo "$vm_name" &>/dev/null; then
         ERROR "虚拟机 ${vm_name} 不存在！"
     fi
 
-    LOG "虚拟机 ${vm_name} 磁盘信息："
-    virsh domblklist "$vm_name"
-
-    LOG "磁盘详细信息："
-    local disk_path=$(get_vm_disk_path "$vm_name")
-    LOG "检测到磁盘路径: ${disk_path}"
-    qemu-img info "$disk_path"
+    LOG "正在检查虚拟机 ${vm_name} 的磁盘信息..."
+    local disk_path=$(get_vm_disk_path "$vm_name" "vda1")
+    LOG "主磁盘文件（vda）: ${disk_path}"
 
     LOG "分区信息："
-    virt-filesystems -a "$disk_path" --long -h
-
-    LOG "开始磁盘健康检查..."
-    if qemu-img check "$disk_path" | grep -q "No errors found"; then
-        LOG "磁盘健康状态: ${GREEN}正常${NC}"
-    else
-        WARN "磁盘健康检查发现问题："
-        qemu-img check "$disk_path"
-    fi
-    LOG "=============================================="
-}
-
-# 获取虚拟机内文件系统信息
-get_vm_fs_info() {
-    local disk_path="$1"
-    local target_part="$2"
-    local fs_type=""
-    local mount_point=""
-
-    # 规范化分区名（适配 vda/sda）
-    local part_name="${target_part##*/}"  # 提取 sda1 或 vda1
-    local disk_prefix=$(echo "$target_part" | grep -oE '/dev/[a-z]+')  # 提取 /dev/sda 或 /dev/vda
-
-    # virt-filesystems 使用 sda 命名，替换 vda 为 sda
-    if [[ "$target_part" =~ /dev/vda ]]; then
-        target_part="${target_part/vda/sda}"
-    fi
-
-    # 使用 virt-filesystems 获取精确信息
-    local fs_info=$(virt-filesystems -a "$disk_path" --long -h | grep -E "[[:space:]]${part_name}[[:space:]]")
-
-    if [ -n "$fs_info" ]; then
-        fs_type=$(echo "$fs_info" | awk '{print $2}')
-        mount_point=$(echo "$fs_info" | awk '{print $NF}' | grep -E '^/|^-' | head -1)
-        [ "$mount_point" == "-" ] && mount_point=""
-    fi
-
-    # 备用方案：使用 blkid
-    if [ -z "$fs_type" ]; then
-        fs_type=$(guestfish --ro -a "$disk_path" run : blkid "$target_part" : get TYPE 2>/dev/null)
-    fi
-
-    echo "$fs_type $mount_point"
-}
-
-# 单位转换函数
-human_size() {
-    local bytes=$1
-    if command -v bc &>/dev/null; then
-        if (( bytes >= 1125899906842624 )); then  # 1PB = 1024^5
-            echo "$(echo "scale=1; $bytes / (1024^5)" | bc | awk '{printf "%.1fPiB", $1}')"
-        elif (( bytes >= 1099511627776 )); then  # 1TB = 1024^4
-            echo "$(echo "scale=1; $bytes / (1024^4)" | bc | awk '{printf "%.1fTiB", $1}')"
-        else
-            echo "$(echo "scale=1; $bytes / (1024^3)" | bc | awk '{printf "%.1fGiB", $1}')"
-        fi
-    else
-        if (( bytes >= 1125899906842624 )); then
-            echo "$(( bytes / 1024 / 1024 / 1024 / 1024 / 1024 ))PiB"
-        elif (( bytes >= 1099511627776 )); then
-            echo "$(( bytes / 1024 / 1024 / 1024 / 1024 ))TiB"
-        else
-            echo "$(( bytes / 1024 / 1024 / 1024 ))GiB"
-        fi
-        WARN "未找到 bc 命令，已切换为整数计算"
-    fi
+    virt-filesystems --long --parts --blkdevs -a "$disk_path" 2>/dev/null || ERROR "无法获取分区信息！"
 }
 
 # 扩展虚拟机磁盘
 F_EXPAND_DISK() {
     local vm_name="$1"
-    local target_part="$2"
+    local target_part="$2" # 分区，如 vdb1
     local add_size_gb="$3"
     local force="$4"
     local quiet="$5"
     local dry_run="$6"
 
-    # 验证参数
-    if ! [[ "$add_size_gb" =~ ^[0-9]+$ ]] || [ "$add_size_gb" -eq 0 ]; then
-        ERROR "扩展大小必须是正整数（单位：GB）！"
-    fi
-
-    if ! [[ "$target_part" =~ ^/dev/[sv]da[0-9]+$ ]]; then
-        ERROR "分区格式不正确，请使用 /dev/sdaX 或 /dev/vdaX 格式！"
-    fi
-
-    # 检查虚拟机是否存在
+    # 验证虚拟机是否存在
     if ! virsh dominfo "$vm_name" &>/dev/null; then
         ERROR "虚拟机 ${vm_name} 不存在！"
     fi
 
+    # 解析设备名
+    local device=""
+    if [[ "$target_part" =~ ^(vd[a-z])[0-9]+$ ]]; then
+        device="${BASH_REMATCH[1]}"  # 提取 vdb
+    else
+        ERROR "分区名无效！请使用 vda1、vdb1 等格式。"
+    fi
+
     # 获取磁盘路径
-    local disk_path=$(get_vm_disk_path "$vm_name")
+    local disk_path=$(get_vm_disk_path "$vm_name" "$target_part")
+    local disk_format=$(qemu-img info "$disk_path" | grep "file format" | awk '{print $3}')
+
+    # 验证分区存在
+    if [ "$dry_run" != "yes" ] && ! virt-filesystems --parts -a "$disk_path" | grep -q "$target_part"; then
+        ERROR "磁盘 ${disk_path} 中未找到分区 ${target_part}！"
+    fi
+
+    # 验证扩展大小
+    if ! [[ "$add_size_gb" =~ ^[0-9]+$ ]] || [ "$add_size_gb" -eq 0 ]; then
+        ERROR "扩展大小必须是正整数（单位：GB）！"
+    fi
 
     # 检查虚拟机状态
     local vm_state=$(virsh domstate "$vm_name")
     if [ "$vm_state" != "shut off" ] && [ "$force" != "yes" ]; then
-        ERROR "虚拟机 ${vm_name} 正在运行，请先关闭虚拟机或使用 -f 强制操作（仅扩展磁盘）！"
+        ERROR "虚拟机 ${vm_name} 正在运行，请先关闭或使用 -f 强制扩展！"
     fi
 
-    # 获取当前磁盘大小
-    local disk_format=$(qemu-img info "$disk_path" | awk '/format:/ {print $3}')
-    local current_size_bytes=$(qemu-img info "$disk_path" | awk -F'[ ()]' '/virtual size/ {print $6}')
-    local current_size_gb=$(echo "scale=1; $current_size_bytes / (1024^3)" | bc)
-    local new_size_gb=$(echo "$current_size_gb + $add_size_gb" | bc)
-
-    # 备份提示
-    if [ "$quiet" != "yes" ] && [ "$dry_run" != "yes" ]; then
-        WARN "警告：扩容操作可能导致数据丢失，请确认已备份磁盘：${disk_path}"
-        read -p "是否已完成备份？(y/N): " backup_confirm
-        if [[ ! "$backup_confirm" =~ ^[Yy] ]]; then
-            ERROR "请先备份数据后重试！"
-        fi
-    fi
+    # 规范化分区名用于显示
+    local display_part="/dev/$target_part"
 
     # 显示操作信息
     if [ "$quiet" != "yes" ]; then
@@ -326,111 +242,94 @@ F_EXPAND_DISK() {
         LOG "操作摘要："
         LOG "虚拟机名称:      ${vm_name}"
         LOG "磁盘文件:        ${disk_path}"
-        LOG "磁盘格式:        ${disk_format:-未知}"
-        LOG "当前磁盘大小:    ${current_size_gb}G"
-        LOG "目标分区:        ${target_part}"
-        LOG "扩展大小:        +${add_size_gb}G"
-        LOG "新磁盘大小:      ${new_size_gb}G"
+        LOG "目标分区:        ${display_part}"
+        LOG "扩展大小:        ${add_size_gb}GB"
         LOG "虚拟机状态:      ${vm_state}"
+        LOG "强制模式:        ${force}"
         LOG "=============================================="
 
-        if [ "$dry_run" == "yes" ]; then
-            WARN "[试运行] 将执行以下操作："
-            LOG "1. 扩展磁盘文件: qemu-img resize \"${disk_path}\" \"+${add_size_gb}G\""
-            LOG "2. 调整分区表: virt-resize --expand \"${target_part}\" \"${disk_path}\" \"${disk_path}.resized\""
-            LOG "3. 启动虚拟机并调整文件系统（视情况手动执行）"
-            LOG "=============================================="
-            exit 0
-        fi
-
-        read -p "确认以上信息是否正确？(y/N): " confirm
-        if [[ ! "$confirm" =~ ^[Yy] ]]; then
-            WARN "操作已取消。"
-            exit 0
+        if [ "$dry_run" = "yes" ]; then
+            WARN "[试运行] 以下操作不会实际执行"
+        else
+            WARN "警告：操作可能影响虚拟机，请确认已备份重要数据！"
+            read -p "是否继续？(y/N): " confirm
+            if [[ ! "$confirm" =~ ^[Yy] ]]; then
+                WARN "操作已取消。"
+                exit 0
+            fi
         fi
     fi
 
-    # 1. 扩展磁盘文件
-    LOG "[1/3] 正在扩展磁盘文件..."
-    if ! qemu-img resize "$disk_path" "+${add_size_gb}G"; then
-        ERROR "磁盘扩展失败！"
-    fi
-
-    if [ "$force" == "yes" ] && [ "$vm_state" != "shut off" ]; then
-        LOG "虚拟机运行中，仅扩展磁盘大小，请手动调整分区和文件系统。"
-        LOG "建议执行以下步骤："
-        LOG "  1. 通知内核重新扫描：echo '1' > /sys/block/vda/device/rescan"
-        LOG "  2. 调整分区表（使用 fdisk/parted）"
-        LOG "  3. 扩展文件系统（xfs_growfs/resize2fs）"
-        exit 0
+    # 1. 扩展磁盘
+    local new_size_gb=$(( $(qemu-img info "$disk_path" | grep "virtual size" | awk '{print $3}' | tr -d 'G') + add_size_gb ))
+    if [ "$dry_run" = "yes" ]; then
+        LOG "[试运行] 将扩展磁盘: qemu-img resize \"$disk_path\" ${new_size_gb}G"
+    else
+        LOG "[1/3] 正在扩展磁盘..."
+        if ! qemu-img resize "$disk_path" "${new_size_gb}G"; then
+            ERROR "扩展磁盘失败！"
+        fi
     fi
 
     # 2. 调整分区表
+    if [ "$force" = "yes" ] && [ "$vm_state" != "shut off" ]; then
+        LOG "强制模式：仅扩展磁盘，需手动调整分区表和文件系统。"
+        return
+    fi
+
     LOG "[2/3] 正在调整分区表..."
     local temp_disk="${disk_path}.resized"
     TEMP_FILES+=("$temp_disk")
 
     # 创建临时磁盘
-    if ! qemu-img create -f "$disk_format" "$temp_disk" "${new_size_gb}G"; then
-        ERROR "创建临时磁盘失败！"
+    if [ "$dry_run" = "yes" ]; then
+        LOG "[试运行] 将创建临时磁盘: qemu-img create -f \"$disk_format\" \"$temp_disk\" ${new_size_gb}G"
+    else
+        if ! qemu-img create -f "$disk_format" "$temp_disk" "${new_size_gb}G"; then
+            ERROR "创建临时磁盘失败！"
+        fi
     fi
 
     # 规范化分区名（virt-resize 使用 sda）
-    local resize_part="$target_part"
-    if [[ "$resize_part" =~ /dev/vda ]]; then
-        resize_part="${resize_part/vda/sda}"
+    local resize_part="/dev/sda${target_part#vd[a-z]}"
+
+    # 执行 virt-resize
+    if [ "$dry_run" = "yes" ]; then
+        LOG "[试运行] 将调整分区: virt-resize --expand \"$resize_part\" \"$disk_path\" \"$temp_disk\""
+    else
+        local virt_resize_output
+        if ! virt_resize_output=$(virt-resize --expand "$resize_part" "$disk_path" "$temp_disk" 2>&1); then
+            ERROR "分区调整失败！错误信息：\n$virt_resize_output"
+        fi
     fi
 
-    if ! virt-resize --expand "$resize_part" "$disk_path" "$temp_disk"; then
-        ERROR "分区调整失败！"
+    # 验证临时磁盘
+    if [ "$dry_run" != "yes" ] && [ ! -s "$temp_disk" ]; then
+        ERROR "临时磁盘 $temp_disk 为空或无效，无法继续！"
     fi
 
-    # 替换原磁盘文件
-    if ! mv "$temp_disk" "$disk_path"; then
-        ERROR "替换磁盘文件失败！"
-    fi
-    TEMP_FILES=()
-
-    # 3. 调整文件系统
-    LOG "[3/3] 正在检测文件系统..."
-    read fs_type mount_point <<< $(get_vm_fs_info "$disk_path" "$target_part")
-
-    if [ -z "$fs_type" ]; then
-        WARN "无法检测文件系统类型！"
-        WARN "请启动虚拟机后手动调整文件系统："
-        WARN "  - ext2/3/4: resize2fs $target_part"
-        WARN "  - XFS: xfs_growfs ${mount_point:-/}"
-        LOG "磁盘和分区已扩展，请启动虚拟机：virsh start $vm_name"
-        exit 0
+    # 3. 替换原磁盘
+    if [ "$dry_run" = "yes" ]; then
+        LOG "[试运行] 将替换磁盘: mv \"$temp_disk\" \"$disk_path\""
+    else
+        LOG "[3/3] 正在替换原磁盘文件..."
+        if ! mv "$temp_disk" "$disk_path"; then
+            ERROR "替换磁盘文件失败！"
+        fi
+        TEMP_FILES=()
     fi
 
-    LOG "检测到文件系统: ${fs_type}，挂载点: ${mount_point:-未挂载}"
-    case "$fs_type" in
-        ext[234])
-            WARN "ext 文件系统需在虚拟机内调整，请启动虚拟机后执行："
-            WARN "  resize2fs $target_part"
-            ;;
-        xfs)
-            WARN "XFS 文件系统需在虚拟机内调整，请启动虚拟机后执行："
-            WARN "  xfs_growfs ${mount_point:-/}"
-            ;;
-        swap)
-            LOG "SWAP 分区无需调整文件系统。"
-            ;;
-        *)
-            WARN "不支持的文件系统类型: ${fs_type}"
-            WARN "请手动调整文件系统。"
-            ;;
-    esac
-
-    LOG "磁盘和分区已扩展，请启动虚拟机：virsh start $vm_name"
-    LOG "=============================================="
-    LOG "操作成功完成！"
-    LOG "虚拟机:        ${vm_name}"
-    LOG "分区:          ${target_part}"
-    LOG "扩展大小:      +${add_size_gb}G"
-    LOG "新磁盘大小:    ${new_size_gb}G"
-    LOG "=============================================="
+    # 提示用户扩展文件系统
+    if [ "$dry_run" != "yes" ]; then
+        LOG "磁盘扩容完成，请启动虚拟机并登录执行以下命令扩展文件系统："
+        if virt-filesystems --long -a "$disk_path" | grep "$resize_part" | grep -q "ext4"; then
+            LOG "resize2fs $display_part"
+        elif virt-filesystems --long -a "$disk_path" | grep "$resize_part" | grep -q "xfs"; then
+            LOG "xfs_growfs <挂载点>"
+        else
+            LOG "请根据文件系统类型手动扩展（例如 resize2fs 或 xfs_growfs）。"
+        fi
+    fi
 }
 
 # 主程序
@@ -490,6 +389,8 @@ main() {
                         F_HELP
                         exit 1
                     fi
+                elif [ "$action" = "check" ]; then
+                    : # 已处理
                 else
                     ERROR "未知参数：$1"
                     F_HELP
