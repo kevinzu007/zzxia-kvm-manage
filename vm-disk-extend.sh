@@ -4,8 +4,8 @@
 # License: GNU GPLv3
 # Test On: Rocky Linux 9
 # Updated By: Grok 3 (xAI)
-# Update Date: 2025-04-15
-# Version: 1.1.6
+# Update Date: 2025-04-16
+# Version: 1.1.7
 #############################################################################
 
 # sh
@@ -15,7 +15,7 @@ cd ${SH_PATH}
 
 # 脚本名称和版本
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.1.6"
+VERSION="1.1.7"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -269,7 +269,6 @@ get_vm_fs_info() {
     local disk_path="$1"
     local target_part="$2"
     local fs_type=""
-    local mount_point=""
 
     # 规范化分区名（适配 vda/vdb/sda/sdb）
     local virt_part="$target_part"
@@ -288,24 +287,7 @@ EOF
         fs_type="unknown"
     fi
 
-    # 获取挂载点（非 swap 分区）
-    if [ "$fs_type" != "swap" ] && [ "$fs_type" != "unknown" ]; then
-        mount_point=$(guestfish --ro -a "$disk_path" <<EOF 2>/dev/null
-            run
-            mount $virt_part /
-            mounts
-EOF
-        )
-        mount_point=$(echo "$mount_point" | grep -o '/.*' | head -1)
-        [ -z "$mount_point" ] && mount_point=""
-    fi
-
-    # 处理特殊情况
-    if [ "$fs_type" = "swap" ]; then
-        mount_point=""
-    fi
-
-    echo "$fs_type $mount_point"
+    echo "$fs_type"
 }
 
 # 单位转换函数
@@ -361,11 +343,8 @@ F_EXPAND_DISK() {
 
     # 验证分区存在性
     local part_list=$(guestfish --ro -a "$disk_path" run : list-filesystems | grep -E "/dev/[sv]d[a-z][0-9]+")
-    local check_part="$target_part"
-    if [[ "$check_part" =~ /dev/vd ]]; then
-        check_part="${check_part/vd/sd}"
-    fi
-    if ! echo "$part_list" | grep -q "$check_part"; then
+    local part_num="${target_part##*[a-z]}"  # 提取分区号，如 1
+    if ! echo "$part_list" | grep -q "[sv]d[a-z]${part_num}"; then
         WARN "可用分区：\n$part_list"
         ERROR "分区 ${target_part} 不存在于磁盘 ${disk_path}！"
     fi
@@ -421,17 +400,17 @@ F_EXPAND_DISK() {
             fi
             LOG "2. 调整分区表: virt-resize --expand \"${resize_part}\" \"${disk_path}\" \"${disk_path}.resized\""
             LOG "3. 检测文件系统..."
-            read fs_type mount_point <<< $(get_vm_fs_info "$disk_path" "$target_part")
+            local fs_type=$(get_vm_fs_info "$disk_path" "$target_part")
             if [ -z "$fs_type" ] || [ "$fs_type" = "unknown" ]; then
                 LOG "   无法检测文件系统类型，将提示手动调整"
             else
-                LOG "   检测到文件系统: ${fs_type}，挂载点: ${mount_point:-未挂载}"
+                LOG "   检测到文件系统: ${fs_type}"
                 case "$fs_type" in
                     ext[234])
                         LOG "   将执行: resize2fs ${target_part}"
                         ;;
                     xfs)
-                        LOG "   将执行: xfs_growfs ${mount_point:-/}"
+                        LOG "   将提示在虚拟机内执行: xfs_growfs <挂载点>"
                         ;;
                     swap)
                         LOG "   SWAP 分区无需调整文件系统"
@@ -503,18 +482,18 @@ F_EXPAND_DISK() {
 
     # 3. 调整文件系统
     LOG "[3/3] 正在检测文件系统..."
-    read fs_type mount_point <<< $(get_vm_fs_info "$disk_path" "$target_part")
+    local fs_type=$(get_vm_fs_info "$disk_path" "$target_part")
 
     if [ -z "$fs_type" ] || [ "$fs_type" = "unknown" ]; then
         WARN "无法检测文件系统类型！"
         WARN "请启动虚拟机后手动调整文件系统："
         WARN "  - ext2/3/4: resize2fs $target_part"
-        WARN "  - XFS: xfs_growfs ${mount_point:-/}"
+        WARN "  - XFS: xfs_growfs <挂载点>"
         LOG "磁盘和分区已扩展，请启动虚拟机：virsh start $vm_name"
         exit 0
     fi
 
-    LOG "检测到文件系统: ${fs_type}，挂载点: ${mount_point:-未挂载}"
+    LOG "检测到文件系统: ${fs_type}"
     case "$fs_type" in
         ext[234])
             WARN "ext 文件系统需在虚拟机内调整，请启动虚拟机后执行："
@@ -522,7 +501,7 @@ F_EXPAND_DISK() {
             ;;
         xfs)
             WARN "XFS 文件系统需在虚拟机内调整，请启动虚拟机后执行："
-            WARN "  xfs_growfs ${mount_point:-/}"
+            WARN "  xfs_growfs <挂载点>"
             ;;
         swap)
             LOG "SWAP 分区无需调整文件系统。"
