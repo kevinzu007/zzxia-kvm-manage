@@ -5,7 +5,7 @@
 # Test On: Rocky Linux 9
 # Updated By: Grok 3 (xAI)
 # Update Date: 2025-04-16
-# Version: 1.0.2
+# Version: 1.0.4
 #############################################################################
 
 # 脚本名称和版本
@@ -14,7 +14,7 @@ SH_PATH=$( cd "$( dirname "$0" )" && pwd )
 cd ${SH_PATH}
 
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.0.2"
+VERSION="1.0.4"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -101,23 +101,23 @@ ${GREEN}注意：${NC}
     * 重要数据请提前备份，脚本会提示备份
     * 需要root权限执行
 ${GREEN}参数语法规范：${NC}
-    无包围符号：-a                : 必选【选项】
-                ：val              : 必选【参数值】
-                ：val1 val2 -a -b  : 必选【选项或参数值】，且不分先后顺序
-    []         ：[-a]             : 可选【选项】
-                ：[val]            : 可选【参数值】
-    <>         ：<val>            : 需替换的具体值（用户必须提供）
-    %%         ：%val%            : 通配符（包含匹配，如%error%匹配error_code）
-    |          ：val1|val2|<valn> : 多选一
-    {}         ：{-a <val>}       : 必须成组出现【选项+参数值】
-                ：{val1 val2}      : 必须成组的【参数值组合】，且必须按顺序提供
+    无包围符号  ：-a               : 必选【选项】
+                  ：val              : 必选【参数值】
+                  ：val1 val2 -a -b  : 必选【选项或参数值】，且不分先后顺序
+    []            ：[-a]             : 可选【选项】
+                  ：[val]            : 可选【参数值】
+    <>            ：<val>            : 需替换的具体值（用户必须提供）
+    %%            ：%val%            : 通配符（包含匹配，如%error%匹配error_code）
+    |             ：val1|val2|<valn> : 多选一
+    {}            ：{-a <val>}       : 必须成组出现【选项+参数值】
+                  ：{val1 val2}      : 必须成组的【参数值组合】，且必须按顺序提供
 ${GREEN}用法：${NC}
     $0 -h|--help                                        #-- 显示帮助
     $0 -v|--version                                     #-- 显示版本
-    $0 -c|--create {-n|--name <虚拟机名称>} <快照名称>    #-- 创建快照
-    $0 -r|--revert {-n|--name <虚拟机名称>} <快照名称>    #-- 回滚快照
-    $0 -d|--delete {-n|--name <虚拟机名称>} <快照名称>    #-- 删除快照
-    $0 -l|--list {-n|--name <虚拟机名称>}                #-- 列出快照
+    $0 -l|--list {-n|--name <虚拟机名称>}               #-- 列出快照
+    $0 {-c|--create <快照名称>} {-n|--name <虚拟机名称>}    #-- 创建快照
+    $0 {-r|--revert <快照名称>} {-n|--name <虚拟机名称>}    #-- 回滚快照
+    $0 {-d|--delete <快照名称>} {-n|--name <虚拟机名称>}    #-- 删除快照
 ${GREEN}参数说明：${NC}
     -h|--help           显示此帮助信息
     -v|--version        显示脚本版本
@@ -326,21 +326,24 @@ while true; do
                 ERROR "不能同时指定多个操作！仅支持 -c|-r|-d|-l 之一"
             fi
             ACTION="create"
-            shift
+            SNAP_NAME="$2"
+            shift 2
             ;;
         -r|--revert)
             if [[ "$ACTION" && "$ACTION" != "revert" ]]; then
                 ERROR "不能同时指定多个操作！仅支持 -c|-r|-d|-l 之一"
             fi
             ACTION="revert"
-            shift
+            SNAP_NAME="$2"
+            shift 2
             ;;
         -d|--delete)
             if [[ "$ACTION" && "$ACTION" != "delete" ]]; then
                 ERROR "不能同时指定多个操作！仅支持 -c|-r|-d|-l 之一"
             fi
             ACTION="delete"
-            shift
+            SNAP_NAME="$2"
+            shift 2
             ;;
         -l|--list)
             if [[ "$ACTION" && "$ACTION" != "list" ]]; then
@@ -367,12 +370,10 @@ while true; do
     esac
 done
 
-# 处理剩余参数
+# 处理剩余参数（仅用于省略 -n 的情况）
 while [[ $# -gt 0 ]]; do
     if [[ -z "$VM_NAME" && "$1" != -* ]]; then
         VM_NAME="$1"
-    elif [[ -z "$SNAP_NAME" && "$ACTION" != "list" && "$1" != -* ]]; then
-        SNAP_NAME="$1"
     else
         ERROR "无效参数：$1"
     fi
@@ -384,7 +385,7 @@ if [[ -z "$VM_NAME" && "$ACTION" ]]; then
     ERROR "必须指定虚拟机名称！请使用 -n|--name 或直接提供虚拟机名称"
 fi
 
-if [[ "$ACTION" != "list" && -z "$SNAP_NAME" && -n "$ACTION" ]]; then
+if [[ "$ACTION" != "list" && -z "$SNAP_NAME" ]]; then
     ERROR "必须为操作 ${ACTION} 指定快照名称！"
 fi
 
