@@ -5,7 +5,7 @@
 # Test On: Rocky Linux 9
 # Updated By: Grok 3 (xAI)
 # Update Date: 2025-04-15
-# Version: 1.1.4
+# Version: 1.1.6
 #############################################################################
 
 # sh
@@ -15,7 +15,7 @@ cd ${SH_PATH}
 
 # 脚本名称和版本
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.1.4"
+VERSION="1.1.6"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -69,7 +69,7 @@ check_root() {
 
 # 检查依赖工具
 check_dependencies() {
-    local deps=("qemu-img" "virsh" "xmllint" "virt-resize" "virt-filesystems" "guestfish")
+    local deps=("qemu-img" "virsh" "xmllint" "virt-resize" "guestfish")
     for dep in "${deps[@]}"; do
         if ! command -v "$dep" &>/dev/null; then
             ERROR "缺少依赖工具：${dep}。请安装后再运行。"
@@ -89,7 +89,7 @@ ${RED}不支持的类型：${NC}
     * iSCSI存储
     * 其他网络存储
 ${GREEN}依赖：${NC}
-    * libguestfs-tools (包含virt-resize, virt-filesystems等工具)
+    * libguestfs-tools (包含virt-resize, guestfish等工具)
     * qemu-img
     * virsh
     * xmllint
@@ -250,7 +250,7 @@ F_CHECK_DISK() {
             LOG "磁盘 ${i}: ${disk_path}"
             qemu-img info "$disk_path"
             LOG "分区信息："
-            virt-filesystems -a "$disk_path" --long -h
+            guestfish --ro -a "$disk_path" run : list-filesystems
             LOG "开始磁盘健康检查..."
             if qemu-img check "$disk_path" | grep -q "No errors"; then
                 LOG "磁盘健康状态: ${GREEN}正常${NC}"
@@ -272,24 +272,37 @@ get_vm_fs_info() {
     local mount_point=""
 
     # 规范化分区名（适配 vda/vdb/sda/sdb）
-    local part_name="${target_part##*/}"  # 提取分区名，如 vda1 → vda1
     local virt_part="$target_part"
     if [[ "$virt_part" =~ /dev/vd ]]; then
         virt_part="${virt_part/vd/sd}"
     fi
-    local virt_part_name="${virt_part##*/}"  # 提取 sda1
 
-    # 使用 virt-filesystems 获取精确信息
-    local fs_info=$(virt-filesystems -a "$disk_path" --long -h | grep -E "^${virt_part}[[:space:]]")
-    if [ -n "$fs_info" ]; then
-        fs_type=$(echo "$fs_info" | awk '{print $3}')  # 第3列是 VFS（如 xfs）
-        mount_point=$(virt-filesystems -a "$disk_path" --partitions --mountpoints | grep "^${virt_part_name}:" | cut -d' ' -f2-)
+    # 使用 guestfish 获取文件系统类型
+    fs_type=$(guestfish --ro -a "$disk_path" <<EOF 2>/dev/null
+        run
+        blkid $virt_part
+EOF
+    )
+    fs_type=$(echo "$fs_type" | grep -E "^TYPE:" | cut -d' ' -f2- | tr -d '"')
+    if [ -z "$fs_type" ]; then
+        fs_type="unknown"
+    fi
+
+    # 获取挂载点（非 swap 分区）
+    if [ "$fs_type" != "swap" ] && [ "$fs_type" != "unknown" ]; then
+        mount_point=$(guestfish --ro -a "$disk_path" <<EOF 2>/dev/null
+            run
+            mount $virt_part /
+            mounts
+EOF
+        )
+        mount_point=$(echo "$mount_point" | grep -o '/.*' | head -1)
         [ -z "$mount_point" ] && mount_point=""
     fi
 
-    # 备用方案：使用 blkid
-    if [ -z "$fs_type" ]; then
-        fs_type=$(guestfish --ro -a "$disk_path" run : blkid "$virt_part" : get TYPE 2>/dev/null)
+    # 处理特殊情况
+    if [ "$fs_type" = "swap" ]; then
+        mount_point=""
     fi
 
     echo "$fs_type $mount_point"
@@ -347,7 +360,7 @@ F_EXPAND_DISK() {
     local disk_path=$(get_vm_disk_path "$vm_name" "$target_part")
 
     # 验证分区存在性
-    local part_list=$(virt-filesystems -a "$disk_path" --partitions | grep -E "/dev/[sv]d[a-z][0-9]+")
+    local part_list=$(guestfish --ro -a "$disk_path" run : list-filesystems | grep -E "/dev/[sv]d[a-z][0-9]+")
     local check_part="$target_part"
     if [[ "$check_part" =~ /dev/vd ]]; then
         check_part="${check_part/vd/sd}"
@@ -409,7 +422,7 @@ F_EXPAND_DISK() {
             LOG "2. 调整分区表: virt-resize --expand \"${resize_part}\" \"${disk_path}\" \"${disk_path}.resized\""
             LOG "3. 检测文件系统..."
             read fs_type mount_point <<< $(get_vm_fs_info "$disk_path" "$target_part")
-            if [ -z "$fs_type" ]; then
+            if [ -z "$fs_type" ] || [ "$fs_type" = "unknown" ]; then
                 LOG "   无法检测文件系统类型，将提示手动调整"
             else
                 LOG "   检测到文件系统: ${fs_type}，挂载点: ${mount_point:-未挂载}"
@@ -492,7 +505,7 @@ F_EXPAND_DISK() {
     LOG "[3/3] 正在检测文件系统..."
     read fs_type mount_point <<< $(get_vm_fs_info "$disk_path" "$target_part")
 
-    if [ -z "$fs_type" ]; then
+    if [ -z "$fs_type" ] || [ "$fs_type" = "unknown" ]; then
         WARN "无法检测文件系统类型！"
         WARN "请启动虚拟机后手动调整文件系统："
         WARN "  - ext2/3/4: resize2fs $target_part"
