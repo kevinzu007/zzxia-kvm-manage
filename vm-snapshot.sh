@@ -5,7 +5,7 @@
 # Test On: Rocky Linux 9
 # Updated By: Grok 3 (xAI)
 # Update Date: 2025-04-16
-# Version: 1.0.0
+# Version: 1.0.1
 #############################################################################
 
 # 脚本名称和版本
@@ -14,7 +14,7 @@ SH_PATH=$( cd "$( dirname "$0" )" && pwd )
 cd ${SH_PATH}
 
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.0.0"
+VERSION="1.0.1"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -301,7 +301,7 @@ F_MAIN() {
 }
 
 # 解析参数
-TEMP=$(getopt -o n:c:r:d:lhv --long name:,create:,revert:,delete:,list,help,version -n "$0" -- "$@")
+TEMP=$(getopt -o n:c:r:d:lhv --long name:,create:,revert:,delete:,list,help,version -- "$@")
 if [[ $? -ne 0 ]]; then
     ERROR "解析参数失败！"
 fi
@@ -319,21 +319,33 @@ while true; do
             shift 2
             ;;
         -c|--create)
+            if [[ "$ACTION" && "$ACTION" != "create" ]]; then
+                ERROR "不能同时指定多个操作！仅支持 -c|-r|-d|-l 之一"
+            fi
             ACTION="create"
             SNAP_NAME="$2"
             shift 2
             ;;
         -r|--revert)
+            if [[ "$ACTION" && "$ACTION" != "revert" ]]; then
+                ERROR "不能同时指定多个操作！仅支持 -c|-r|-d|-l 之一"
+            fi
             ACTION="revert"
             SNAP_NAME="$2"
             shift 2
             ;;
         -d|--delete)
+            if [[ "$ACTION" && "$ACTION" != "delete" ]]; then
+                ERROR "不能同时指定多个操作！仅支持 -c|-r|-d|-l 之一"
+            fi
             ACTION="delete"
             SNAP_NAME="$2"
             shift 2
             ;;
         -l|--list)
+            if [[ "$ACTION" && "$ACTION" != "list" ]]; then
+                ERROR "不能同时指定多个操作！仅支持 -c|-r|-d|-l 之一"
+            fi
             ACTION="list"
             shift
             ;;
@@ -350,13 +362,25 @@ while true; do
             break
             ;;
         *)
-            ERROR "未知选项：$1"
+            ERROR "未知选项或参数：$1"
             ;;
     esac
 done
 
+# 处理剩余参数
+while [[ $# -gt 0 ]]; do
+    if [[ -z "$VM_NAME" && "$1" != -* ]]; then
+        VM_NAME="$1"
+    elif [[ -z "$SNAP_NAME" && "$ACTION" != "list" && "$1" != -* ]]; then
+        SNAP_NAME="$1"
+    else
+        ERROR "无效参数：$1"
+    fi
+    shift
+done
+
 # 验证参数
-if [[ -z "$VM_NAME" && "$ACTION" != "" ]]; then
+if [[ -z "$VM_NAME" && "$ACTION" ]]; then
     ERROR "必须指定虚拟机名称！请使用 -n|--name"
 fi
 
