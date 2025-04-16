@@ -5,7 +5,7 @@
 # Test On: Rocky Linux 9
 # Updated By: Grok 3 (xAI)
 # Update Date: 2025-04-16
-# Version: 1.1.9
+# Version: 1.1.10
 #############################################################################
 
 # sh
@@ -15,13 +15,16 @@ cd ${SH_PATH}
 
 # 脚本名称和版本
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.1.9"
+VERSION="1.1.10"
 
 # 颜色定义
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
+
+# 日志文件
+LOG_FILE="/var/log/vm-disk-extend.log"
 
 # 临时文件列表
 TEMP_FILES=()
@@ -35,17 +38,20 @@ fi
 LOG() {
     if [ "$QUIET" != "yes" ]; then
         echo -e "${GREEN}[$(date "+%H:%M:%S")] ${SH_NAME}: $*${NC}"
+        echo "[$(date "+%Y-%m-%d %H:%M:%S")] ${SH_NAME}: $*" >> "$LOG_FILE"
     fi
 }
 
 ERROR() {
     echo -e "${RED}[$(date "+%H:%M:%S")] ${SH_NAME}: $*${NC}" >&2
+    echo "[$(date "+%Y-%m-%d %H:%M:%S")] ${SH_NAME}: ERROR: $*" >> "$LOG_FILE"
     exit 1
 }
 
 WARN() {
     if [ "$QUIET" != "yes" ]; then
         echo -e "${YELLOW}[$(date "+%H:%M:%S")] ${SH_NAME}: $*${NC}"
+        echo "[$(date "+%Y-%m-%d %H:%M:%S")] ${SH_NAME}: WARN: $*" >> "$LOG_FILE"
     fi
 }
 
@@ -289,10 +295,43 @@ EOF
     echo "$fs_type"
 }
 
-# 获取挂载点（占位）
+# 获取挂载点
 get_mount_point() {
-    # TODO: 解析 /etc/fstab 获取挂载点
-    echo ""
+    local disk_path="$1"
+    local target_part="$2"
+    local mount_point=""
+
+    local part_num="${target_part##*[a-z]}"
+    local virt_part="/dev/sda${part_num}"
+
+    # 获取 UUID
+    local uuid=$(guestfish --ro -a "$disk_path" <<EOF 2>/dev/null
+        run
+        blkid $virt_part | grep UUID
+EOF
+    )
+    uuid=$(echo "$uuid" | grep -E "^UUID:" | cut -d' ' -f2- | tr -d '"')
+
+    # 查找根分区
+    local fs_list=$(guestfish --ro -a "$disk_path" run : list-filesystems)
+    local root_part=""
+    if echo "$fs_list" | grep -q "/dev/sda[0-9]*:xfs"; then
+        root_part=$(echo "$fs_list" | grep ":xfs" | head -1 | cut -d' ' -f1)
+    elif echo "$fs_list" | grep -q "/dev/sda[0-9]*:ext[234]"; then
+        root_part=$(echo "$fs_list" | grep ":ext[234]" | head -1 | cut -d' ' -f1)
+    fi
+
+    if [ -n "$root_part" ]; then
+        mount_point=$(guestfish --ro -a "$disk_path" <<EOF 2>/dev/null
+            run
+            mount-ro $root_part /
+            cat /etc/fstab | grep -E "$uuid|/dev/vd[a-z]${part_num}"
+EOF
+        )
+        mount_point=$(echo "$mount_point" | awk '{print $2}' | head -1)
+    fi
+
+    echo "$mount_point"
 }
 
 # 单位转换函数
@@ -404,6 +443,7 @@ F_EXPAND_DISK() {
             LOG "2. 调整分区表: virt-resize --expand \"${resize_part}\" \"${disk_path}\" \"${disk_path}.resized\""
             LOG "3. 检测文件系统..."
             local fs_type=$(get_vm_fs_info "$disk_path" "$target_part")
+            local mount_point=$(get_mount_point "$disk_path" "$target_part")
             if [ -z "$fs_type" ] || [ "$fs_type" = "unknown" ]; then
                 LOG "   无法检测文件系统类型，将提示手动调整"
             else
@@ -413,7 +453,11 @@ F_EXPAND_DISK() {
                         LOG "   将执行: resize2fs ${target_part}"
                         ;;
                     xfs)
-                        LOG "   将提示在虚拟机内执行: xfs_growfs <挂载点>"
+                        if [ -n "$mount_point" ]; then
+                            LOG "   将提示在虚拟机内执行: xfs_growfs ${mount_point}"
+                        else
+                            LOG "   将提示在虚拟机内执行: xfs_growfs <挂载点>"
+                        fi
                         ;;
                     swap)
                         LOG "   SWAP 分区无需调整文件系统"
@@ -484,6 +528,7 @@ F_EXPAND_DISK() {
     # 3. 调整文件系统
     LOG "[3/3] 正在检测文件系统..."
     local fs_type=$(get_vm_fs_info "$disk_path" "$target_part")
+    local mount_point=$(get_mount_point "$disk_path" "$target_part")
 
     if [ -z "$fs_type" ] || [ "$fs_type" = "unknown" ]; then
         WARN "无法检测文件系统类型！"
@@ -497,12 +542,28 @@ F_EXPAND_DISK() {
     LOG "检测到文件系统: ${fs_type}"
     case "$fs_type" in
         ext[234])
-            WARN "ext 文件系统需在虚拟机内调整，请启动虚拟机后执行："
-            WARN "  resize2fs $target_part"
+            # 检查文件系统是否已扩展
+            local fs_size=$(guestfish --ro -a "$disk_path" <<EOF 2>/dev/null
+                run
+                dumpe2fs $resize_part | grep "Block count"
+EOF
+            )
+            fs_size=$(echo "$fs_size" | awk '{print $3}')
+            local disk_size_bytes=$(qemu-img info "$disk_path" | awk -F'[ ()]' '/virtual size/ {print $6}')
+            if [ -n "$fs_size" ] && [ "$fs_size" -ge $((disk_size_bytes/4096-1000)) ]; then
+                LOG "ext4 文件系统已自动扩展，无需手动调整。"
+            else
+                WARN "ext 文件系统需在虚拟机内调整，请启动虚拟机后执行："
+                WARN "  resize2fs $target_part"
+            fi
             ;;
         xfs)
             WARN "XFS 文件系统需在虚拟机内调整，请启动虚拟机后执行："
-            WARN "  xfs_growfs <挂载点>"
+            if [ -n "$mount_point" ]; then
+                WARN "  xfs_growfs $mount_point"
+            else
+                WARN "  xfs_growfs <挂载点>"
+            fi
             ;;
         swap)
             LOG "SWAP 分区无需调整文件系统。"
@@ -527,6 +588,9 @@ F_EXPAND_DISK() {
 main() {
     check_root
     check_dependencies
+
+    # 确保日志文件可写
+    touch "$LOG_FILE" 2>/dev/null || LOG_FILE="/tmp/vm-disk-extend.log"
 
     # 参数处理
     local action=""
