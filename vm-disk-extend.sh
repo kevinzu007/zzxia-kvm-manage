@@ -5,7 +5,7 @@
 # Test On: Rocky Linux 9
 # Updated By: Grok 3 (xAI)
 # Update Date: 2025-04-16
-# Version: 1.1.13
+# Version: 1.1.14
 #############################################################################
 
 # sh
@@ -15,16 +15,17 @@ cd ${SH_PATH}
 
 # 脚本名称和版本
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.1.13"
+VERSION="1.1.14"
 
 # 颜色定义
-RED='\033[0;31m'
+RED напомнить='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
 # 日志文件
 LOG_FILE="/var/log/vm-disk-extend.log"
+MAX_LOG_SIZE=$((10*1024*1024))  # 10MB
 
 # 临时文件列表
 TEMP_FILES=()
@@ -65,6 +66,12 @@ cleanup() {
 }
 
 trap cleanup EXIT INT TERM
+
+# 检查日志大小
+if [ -f "$LOG_FILE" ] && [ "$(stat -c %s "$LOG_FILE" 2>/dev/null)" -gt "$MAX_LOG_SIZE" ]; then
+    mv "$LOG_FILE" "${LOG_FILE}.$(date +%F_%H%M%S)"
+    touch "$LOG_FILE"
+fi
 
 # 检查 root 权限
 check_root() {
@@ -448,14 +455,14 @@ F_EXPAND_DISK() {
     if [ "$fs_type" = "swap" ]; then
         part_size_bytes=$(guestfish --ro -a "$disk_path" <<EOF 2>/dev/null
             run
-            part-list /dev/sda | grep "^${part_num}" | grep "part_size" | awk '{print \$2}'
-EOF
+            part-list /dev/sda | grep -B3 "part_num: ${part_num}" | grep "part_size" | awk '{print \$2}'
+        EOF
         )
     else
         part_size_bytes=$(guestfish --ro -a "$disk_path" <<EOF 2>/dev/null
             run
             blockdev-getsize64 $virt_part
-EOF
+        EOF
         )
     fi
     if [ -n "$part_size_bytes" ]; then
@@ -491,10 +498,10 @@ EOF
         LOG "虚拟机名称:      ${vm_name}"
         LOG "磁盘文件:        ${disk_path}"
         LOG "磁盘格式:        ${disk_format:-未知}"
-        LOG "当前分区大小:    ${current_size_gb}G"
+        LOG "当前磁盘/分区大小:    ${current_size_gb}G"
         LOG "目标分区:        ${target_part}"
         LOG "扩展大小:        +${add_size_gb}G"
-        LOG "新分区大小:      ${new_size_gb}G"
+        LOG "新磁盘/分区大小:      ${new_size_gb}G"
         LOG "虚拟机状态:      ${vm_state}"
         LOG "=============================================="
 
@@ -512,10 +519,10 @@ EOF
                 LOG "   检测到文件系统: ${fs_type}"
                 case "$fs_type" in
                     ext[234])
-                        LOG "   检查 ext${fs_type##ext} 文件系统大小"
+                        LOG "   ext${fs_type##ext} 文件系统将在调整分区后自动扩展"
                         ;;
                     xfs)
-                        LOG "   检查 XFS 文件系统大小"
+                        LOG "   XFS 文件系统将在调整分区后自动扩展"
                         ;;
                     swap)
                         LOG "   SWAP 分区无需调整文件系统"
@@ -653,7 +660,7 @@ EOF
     LOG "虚拟机:        ${vm_name}"
     LOG "分区:          ${target_part}"
     LOG "扩展大小:      +${add_size_gb}G"
-    LOG "新分区大小:    ${new_size_gb}G"
+    LOG "新磁盘/分区大小:    ${new_size_gb}G"
     LOG "=============================================="
 }
 
