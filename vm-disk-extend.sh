@@ -5,7 +5,7 @@
 # Test On: Rocky Linux 9
 # Updated By: Grok 3 (xAI)
 # Update Date: 2025-04-16
-# Version: 1.1.8
+# Version: 1.1.9
 #############################################################################
 
 # sh
@@ -15,7 +15,7 @@ cd ${SH_PATH}
 
 # 脚本名称和版本
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.1.8"
+VERSION="1.1.9"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -289,6 +289,12 @@ EOF
     echo "$fs_type"
 }
 
+# 获取挂载点（占位）
+get_mount_point() {
+    # TODO: 解析 /etc/fstab 获取挂载点
+    echo ""
+}
+
 # 单位转换函数
 human_size() {
     local bytes=$1
@@ -393,10 +399,8 @@ F_EXPAND_DISK() {
         if [ "$dry_run" == "yes" ]; then
             WARN "[试运行] 将执行以下操作："
             LOG "1. 扩展磁盘文件: qemu-img resize \"${disk_path}\" \"+${add_size_gb}G\""
-            local resize_part="$target_part"
-            if [[ "$resize_part" =~ /dev/vd ]]; then
-                resize_part="${resize_part/vd/sd}"
-            fi
+            local part_num="${target_part##*[a-z]}"  # 提取分区号，如 1
+            local resize_part="/dev/sda${part_num}"
             LOG "2. 调整分区表: virt-resize --expand \"${resize_part}\" \"${disk_path}\" \"${disk_path}.resized\""
             LOG "3. 检测文件系统..."
             local fs_type=$(get_vm_fs_info "$disk_path" "$target_part")
@@ -463,11 +467,9 @@ F_EXPAND_DISK() {
         ERROR "创建临时磁盘失败！"
     fi
 
-    # 规范化分区名（virt-resize 使用 sda/sdb）
-    local resize_part="$target_part"
-    if [[ "$resize_part" =~ /dev/vd ]]; then
-        resize_part="${resize_part/vd/sd}"
-    fi
+    # 使用 sdaX 作为 resize_part
+    local part_num="${target_part##*[a-z]}"  # 提取分区号，如 1
+    local resize_part="/dev/sda${part_num}"
 
     if ! virt-resize --expand "$resize_part" "$disk_path" "$temp_disk"; then
         ERROR "分区调整失败！"
