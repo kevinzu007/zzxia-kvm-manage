@@ -5,7 +5,7 @@
 # Test On: Rocky Linux 9
 # Updated By: Grok 3 (xAI)
 # Update Date: 2025-04-16
-# Version: 1.1.14
+# Version: 1.1.15
 #############################################################################
 
 # sh
@@ -15,7 +15,7 @@ cd ${SH_PATH}
 
 # 脚本名称和版本
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.1.14"
+VERSION="1.1.15"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -75,7 +75,7 @@ check_root() {
 
 # 检查依赖工具
 check_dependencies() {
-    local deps=("qemu-img" "virsh" "xmllint" "virt-resize" "guestfish")
+    local deps=("qemu-img" "virsh" "xmllint" "virt-resize" "guestfish" "bc")
     for dep in "${deps[@]}"; do
         if ! command -v "$dep" &>/dev/null; then
             ERROR "缺少依赖工具：${dep}。请安装后再运行。"
@@ -99,6 +99,7 @@ ${GREEN}依赖：${NC}
     * qemu-img
     * virsh
     * xmllint
+    * bc
 ${GREEN}注意：${NC}
     * 必须在虚拟机关机状态下操作（-f 强制模式仅用于特殊场景）
     * 重要数据请提前备份，脚本会提示备份
@@ -436,6 +437,7 @@ F_EXPAND_DISK() {
     local disk_format=$(qemu-img info "$disk_path" | awk '/format:/ {print $3}')
     local disk_size_bytes=$(qemu-img info "$disk_path" | awk -F'[ ()]' '/virtual size/ {print $6}')
     local disk_size_gb=$(( disk_size_bytes / 1024 / 1024 / 1024 ))  # 整数 GB
+    local target_disk_size_gb=$(( disk_size_gb + add_size_gb ))      # 目标磁盘大小
     local current_size_bytes=""
     local current_size_gb=""
     local new_size_gb=""
@@ -463,9 +465,9 @@ EOF
         )
     fi
     if [ -n "$part_size_bytes" ]; then
-        part_size_gb=$(( part_size_bytes / 1024 / 1024 / 1024 ))
+        part_size_gb=$(echo "scale=1; $part_size_bytes / 1024 / 1024 / 1024" | bc | awk '{printf "%.0f", $1}')
         current_size_gb=$part_size_gb
-        new_size_gb=$(( current_size_gb + add_size_gb ))
+        new_size_gb=$(( current_size_gb + add_size_gb ))  # 分区新大小，仅用于显示
     else
         WARN "无法获取分区 ${target_part} 的大小，使用磁盘总大小 ${disk_size_gb}GB"
         current_size_gb=$disk_size_gb
@@ -473,10 +475,10 @@ EOF
     fi
 
     # 检查临时磁盘空间
-    local required_space=$(( new_size_gb * 1024 * 1024 * 1024 ))
+    local required_space=$(( target_disk_size_gb * 1024 * 1024 * 1024 ))
     local available_space=$(df --output=avail -B1 "$(dirname "$disk_path")" | tail -1)
     if [ "$available_space" -lt "$required_space" ]; then
-        ERROR "磁盘空间不足！需要 ${new_size_gb}GB，当前可用 $(human_size $available_space)。"
+        ERROR "磁盘空间不足！需要 ${target_disk_size_gb}GB，当前可用 $(human_size $available_space)。"
     fi
 
     # 备份提示
@@ -569,7 +571,7 @@ EOF
     TEMP_FILES+=("$temp_disk")
 
     # 创建临时磁盘
-    if ! qemu-img create -f "$disk_format" "$temp_disk" "${new_size_gb}G"; then
+    if ! qemu-img create -f "$disk_format" "$temp_disk" "${target_disk_size_gb}G"; then
         ERROR "创建临时磁盘失败！"
     fi
 
