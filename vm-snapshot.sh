@@ -5,7 +5,7 @@
 # Test On: Rocky Linux 9
 # Updated By: Grok 3 (xAI)
 # Update Date: 2025-04-16
-# Version: 1.0.1
+# Version: 1.0.2
 #############################################################################
 
 # 脚本名称和版本
@@ -14,7 +14,7 @@ SH_PATH=$( cd "$( dirname "$0" )" && pwd )
 cd ${SH_PATH}
 
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.0.1"
+VERSION="1.0.2"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -315,6 +315,9 @@ QUIET="no"
 while true; do
     case "$1" in
         -n|--name)
+            if [[ -n "$VM_NAME" ]]; then
+                ERROR "虚拟机名称只能指定一次！"
+            fi
             VM_NAME="$2"
             shift 2
             ;;
@@ -323,24 +326,21 @@ while true; do
                 ERROR "不能同时指定多个操作！仅支持 -c|-r|-d|-l 之一"
             fi
             ACTION="create"
-            SNAP_NAME="$2"
-            shift 2
+            shift
             ;;
         -r|--revert)
             if [[ "$ACTION" && "$ACTION" != "revert" ]]; then
                 ERROR "不能同时指定多个操作！仅支持 -c|-r|-d|-l 之一"
             fi
             ACTION="revert"
-            SNAP_NAME="$2"
-            shift 2
+            shift
             ;;
         -d|--delete)
             if [[ "$ACTION" && "$ACTION" != "delete" ]]; then
                 ERROR "不能同时指定多个操作！仅支持 -c|-r|-d|-l 之一"
             fi
             ACTION="delete"
-            SNAP_NAME="$2"
-            shift 2
+            shift
             ;;
         -l|--list)
             if [[ "$ACTION" && "$ACTION" != "list" ]]; then
@@ -381,11 +381,11 @@ done
 
 # 验证参数
 if [[ -z "$VM_NAME" && "$ACTION" ]]; then
-    ERROR "必须指定虚拟机名称！请使用 -n|--name"
+    ERROR "必须指定虚拟机名称！请使用 -n|--name 或直接提供虚拟机名称"
 fi
 
 if [[ "$ACTION" != "list" && -z "$SNAP_NAME" && -n "$ACTION" ]]; then
-    ERROR "必须为操作 ${ACTION} 指定快照名称！请使用 -c|-r|-d"
+    ERROR "必须为操作 ${ACTION} 指定快照名称！"
 fi
 
 # 执行主逻辑
