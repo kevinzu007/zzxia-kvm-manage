@@ -5,7 +5,7 @@
 # Test On: Rocky Linux 9
 # Updated By: Grok 3 (xAI)
 # Update Date: 2025-04-16
-# Version: 1.1.12
+# Version: 1.1.13
 #############################################################################
 
 # sh
@@ -15,7 +15,7 @@ cd ${SH_PATH}
 
 # 脚本名称和版本
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.1.12"
+VERSION="1.1.13"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -432,11 +432,41 @@ F_EXPAND_DISK() {
         ERROR "虚拟机 ${vm_name} 正在运行，请先关闭虚拟机或使用 -f 强制操作（仅扩展磁盘）！"
     fi
 
-    # 获取当前磁盘大小
+    # 获取当前磁盘和分区大小
     local disk_format=$(qemu-img info "$disk_path" | awk '/format:/ {print $3}')
-    local current_size_bytes=$(qemu-img info "$disk_path" | awk -F'[ ()]' '/virtual size/ {print $6}')
-    local current_size_gb=$(( current_size_bytes / 1024 / 1024 / 1024 ))  # 整数 GB
-    local new_size_gb=$(( current_size_gb + add_size_gb ))  # 整数加法
+    local disk_size_bytes=$(qemu-img info "$disk_path" | awk -F'[ ()]' '/virtual size/ {print $6}')
+    local disk_size_gb=$(( disk_size_bytes / 1024 / 1024 / 1024 ))  # 整数 GB
+    local current_size_bytes=""
+    local current_size_gb=""
+    local new_size_gb=""
+    local part_size_bytes=""
+    local part_size_gb=""
+    local fs_type=$(get_vm_fs_info "$disk_path" "$target_part")
+
+    # 获取分区大小
+    local virt_part="/dev/sda${part_num}"
+    if [ "$fs_type" = "swap" ]; then
+        part_size_bytes=$(guestfish --ro -a "$disk_path" <<EOF 2>/dev/null
+            run
+            part-list /dev/sda | grep "^${part_num}" | grep "part_size" | awk '{print \$2}'
+EOF
+        )
+    else
+        part_size_bytes=$(guestfish --ro -a "$disk_path" <<EOF 2>/dev/null
+            run
+            blockdev-getsize64 $virt_part
+EOF
+        )
+    fi
+    if [ -n "$part_size_bytes" ]; then
+        part_size_gb=$(( part_size_bytes / 1024 / 1024 / 1024 ))
+        current_size_gb=$part_size_gb
+        new_size_gb=$(( current_size_gb + add_size_gb ))
+    else
+        WARN "无法获取分区 ${target_part} 的大小，使用磁盘总大小 ${disk_size_gb}GB"
+        current_size_gb=$disk_size_gb
+        new_size_gb=$(( current_size_gb + add_size_gb ))
+    fi
 
     # 检查临时磁盘空间
     local required_space=$(( new_size_gb * 1024 * 1024 * 1024 ))
@@ -461,17 +491,16 @@ F_EXPAND_DISK() {
         LOG "虚拟机名称:      ${vm_name}"
         LOG "磁盘文件:        ${disk_path}"
         LOG "磁盘格式:        ${disk_format:-未知}"
-        LOG "当前磁盘大小:    ${current_size_gb}G"
+        LOG "当前分区大小:    ${current_size_gb}G"
         LOG "目标分区:        ${target_part}"
         LOG "扩展大小:        +${add_size_gb}G"
-        LOG "新磁盘大小:      ${new_size_gb}G"
+        LOG "新分区大小:      ${new_size_gb}G"
         LOG "虚拟机状态:      ${vm_state}"
         LOG "=============================================="
 
         if [ "$dry_run" == "yes" ]; then
             WARN "[试运行] 将执行以下操作："
             LOG "1. 扩展磁盘文件: qemu-img resize \"${disk_path}\" \"+${add_size_gb}G\""
-            local part_num="${target_part##*[a-z]}"  # 提取分区号，如 1
             local resize_part="/dev/sda${part_num}"
             LOG "2. 调整分区表: virt-resize --expand \"${resize_part}\" \"${disk_path}\" \"${disk_path}.resized\""
             LOG "3. 检测文件系统..."
@@ -483,10 +512,10 @@ F_EXPAND_DISK() {
                 LOG "   检测到文件系统: ${fs_type}"
                 case "$fs_type" in
                     ext[234])
-                        LOG "   将执行: resize2fs ${target_part}"
+                        LOG "   检查 ext${fs_type##ext} 文件系统大小"
                         ;;
                     xfs)
-                        LOG "   将提示在虚拟机内执行: xfs_growfs ${mount_point:-<挂载点>}"
+                        LOG "   检查 XFS 文件系统大小"
                         ;;
                     swap)
                         LOG "   SWAP 分区无需调整文件系统"
@@ -513,11 +542,11 @@ F_EXPAND_DISK() {
     if ! qemu-img resize "$disk_path" "+${add_size_gb}G"; then
         ERROR "磁盘扩展失败！"
     fi
-    local new_size_bytes=$(qemu-img info "$disk_path" | awk -F'[ ()]' '/virtual size/ {print $6}')
-    if [ -z "$new_size_bytes" ]; then
+    local new_disk_size_bytes=$(qemu-img info "$disk_path" | awk -F'[ ()]' '/virtual size/ {print $6}')
+    if [ -z "$new_disk_size_bytes" ]; then
         ERROR "无法获取新磁盘大小，扩展可能失败！"
     fi
-    if [ "$new_size_bytes" -le "$current_size_bytes" ]; then
+    if [ "$new_disk_size_bytes" -le "$disk_size_bytes" ]; then
         ERROR "磁盘大小未增加，扩展可能失败！"
     fi
 
@@ -541,7 +570,6 @@ F_EXPAND_DISK() {
     fi
 
     # 使用 sdaX 作为 resize_part
-    local part_num="${target_part##*[a-z]}"  # 提取分区号，如 1
     local resize_part="/dev/sda${part_num}"
 
     if ! virt-resize --expand "$resize_part" "$disk_path" "$temp_disk"; then
@@ -558,7 +586,6 @@ F_EXPAND_DISK() {
     LOG "[3/3] 正在检测文件系统..."
     local fs_type=$(get_vm_fs_info "$disk_path" "$target_part")
     local mount_point=$(get_mount_point "$disk_path" "$target_part")
-    local part_num="${target_part##*[a-z]}"
     local resize_part="/dev/sda${part_num}"
 
     if [ -z "$fs_type" ] || [ "$fs_type" = "unknown" ]; then
@@ -573,22 +600,14 @@ F_EXPAND_DISK() {
     LOG "检测到文件系统: ${fs_type}"
     case "$fs_type" in
         ext[234])
-            # 检查文件系统大小
-            local fs_size=$(guestfish --ro -a "$disk_path" <<EOF 2>/dev/null
+            local fs_size_bytes=$(guestfish --ro -a "$disk_path" <<EOF 2>/dev/null
                 run
-                dumpe2fs $resize_part | grep "Block count"
+                blockdev-getsize64 $resize_part
 EOF
             )
-            fs_size=$(echo "$fs_size" | awk '{print $3}')
             local disk_size_bytes=$(qemu-img info "$disk_path" | awk -F'[ ()]' '/virtual size/ {print $6}')
-            local block_size=$(guestfish --ro -a "$disk_path" <<EOF 2>/dev/null
-                run
-                dumpe2fs $resize_part | grep "Block size"
-EOF
-            )
-            block_size=$(echo "$block_size" | awk '{print $3}')
-            if [ -n "$fs_size" ] && [ -n "$block_size" ]; then
-                local fs_size_bytes=$((fs_size * block_size))
+            if [ -n "$fs_size_bytes" ]; then
+                # 允许 1GB 偏差（元数据等）
                 if [ "$fs_size_bytes" -ge $((disk_size_bytes - 1024*1024*1024)) ]; then
                     LOG "ext${fs_type##ext} 文件系统已扩展，无需手动调整。"
                 else
@@ -596,23 +615,18 @@ EOF
                     WARN "  resize2fs $target_part"
                 fi
             else
-                WARN "无法获取 ext${fs_type##ext} 文件系统大小，请启动虚拟机后执行："
+                WARN "无法获取 ext${fs_type##ext} 文件系统大小，建议启动虚拟机后检查："
                 WARN "  resize2fs $target_part"
             fi
             ;;
         xfs)
-            # 检查 XFS 大小
-            local xfs_info=$(guestfish --ro -a "$disk_path" <<EOF 2>/dev/null
+            local xfs_size_bytes=$(guestfish --ro -a "$disk_path" <<EOF 2>/dev/null
                 run
-                mount-ro $resize_part /
-                xfs_info /
+                blockdev-getsize64 $resize_part
 EOF
             )
-            local xfs_blocks=$(echo "$xfs_info" | grep "blocksize" | grep -o "blocks=[0-9]*" | cut -d'=' -f2)
-            local xfs_blocksize=$(echo "$xfs_info" | grep "blocksize" | grep -o "bsize=[0-9]*" | cut -d'=' -f2)
-            if [ -n "$xfs_blocks" ] && [ -n "$xfs_blocksize" ]; then
-                local xfs_size_bytes=$((xfs_blocks * xfs_blocksize))
-                local disk_size_bytes=$(qemu-img info "$disk_path" | awk -F'[ ()]' '/virtual size/ {print $6}')
+            local disk_size_bytes=$(qemu-img info "$disk_path" | awk -F'[ ()]' '/virtual size/ {print $6}')
+            if [ -n "$xfs_size_bytes" ]; then
                 if [ "$xfs_size_bytes" -ge $((disk_size_bytes - 1024*1024*1024)) ]; then
                     LOG "XFS 文件系统已扩展，无需手动调整。"
                 else
@@ -620,7 +634,7 @@ EOF
                     WARN "  xfs_growfs ${mount_point:-<挂载点>}"
                 fi
             else
-                WARN "无法获取 XFS 文件系统大小，请启动虚拟机后执行："
+                WARN "无法获取 XFS 文件系统大小，建议启动虚拟机后检查："
                 WARN "  xfs_growfs ${mount_point:-<挂载点>}"
             fi
             ;;
@@ -639,7 +653,7 @@ EOF
     LOG "虚拟机:        ${vm_name}"
     LOG "分区:          ${target_part}"
     LOG "扩展大小:      +${add_size_gb}G"
-    LOG "新磁盘大小:    ${new_size_gb}G"
+    LOG "新分区大小:    ${new_size_gb}G"
     LOG "=============================================="
 }
 
