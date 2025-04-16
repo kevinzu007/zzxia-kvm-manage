@@ -5,7 +5,7 @@
 # Test On: Rocky Linux 9
 # Updated By: Grok 3 (xAI)
 # Update Date: 2025-04-16
-# Version: 1.1.10
+# Version: 1.1.11
 #############################################################################
 
 # sh
@@ -15,7 +15,7 @@ cd ${SH_PATH}
 
 # 脚本名称和版本
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.1.10"
+VERSION="1.1.11"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -38,20 +38,20 @@ fi
 LOG() {
     if [ "$QUIET" != "yes" ]; then
         echo -e "${GREEN}[$(date "+%H:%M:%S")] ${SH_NAME}: $*${NC}"
-        echo "[$(date "+%Y-%m-%d %H:%M:%S")] ${SH_NAME}: $*" >> "$LOG_FILE"
+        echo "[$(date "+%Y-%m-%d %H:%M:%S")] ${SH_NAME}: $*" | sed 's/\x1B\[[0-9;]*m//g' >> "$LOG_FILE"
     fi
 }
 
 ERROR() {
     echo -e "${RED}[$(date "+%H:%M:%S")] ${SH_NAME}: $*${NC}" >&2
-    echo "[$(date "+%Y-%m-%d %H:%M:%S")] ${SH_NAME}: ERROR: $*" >> "$LOG_FILE"
+    echo "[$(date "+%Y-%m-%d %H:%M:%S")] ${SH_NAME}: ERROR: $*" | sed 's/\x1B\[[0-9;]*m//g' >> "$LOG_FILE"
     exit 1
 }
 
 WARN() {
     if [ "$QUIET" != "yes" ]; then
         echo -e "${YELLOW}[$(date "+%H:%M:%S")] ${SH_NAME}: $*${NC}"
-        echo "[$(date "+%Y-%m-%d %H:%M:%S")] ${SH_NAME}: WARN: $*" >> "$LOG_FILE"
+        echo "[$(date "+%Y-%m-%d %H:%M:%S")] ${SH_NAME}: WARN: $*" | sed 's/\x1B\[[0-9;]*m//g' >> "$LOG_FILE"
     fi
 }
 
@@ -300,9 +300,10 @@ get_mount_point() {
     local disk_path="$1"
     local target_part="$2"
     local mount_point=""
-
-    local part_num="${target_part##*[a-z]}"
+    local part_num="${target_part##*[a-z]}"  # 提取分区号，如 1
     local virt_part="/dev/sda${part_num}"
+    local disk_prefix="${target_part#/dev/}"
+    disk_prefix="${disk_prefix%%[0-9]*}"  # 如 vda, vdb
 
     # 获取 UUID
     local uuid=$(guestfish --ro -a "$disk_path" <<EOF 2>/dev/null
@@ -312,7 +313,21 @@ EOF
     )
     uuid=$(echo "$uuid" | grep -E "^UUID:" | cut -d' ' -f2- | tr -d '"')
 
-    # 查找根分区
+    # 获取文件系统类型
+    local fs_type=$(guestfish --ro -a "$disk_path" <<EOF 2>/dev/null
+        run
+        blkid $virt_part | grep TYPE
+EOF
+    )
+    fs_type=$(echo "$fs_type" | grep -E "^TYPE:" | cut -d' ' -f2- | tr -d '"')
+
+    # 如果是 swap，分区无挂载点
+    if [ "$fs_type" = "swap" ]; then
+        echo ""
+        return
+    fi
+
+    # 查找根分区（优先 xfs，其次 ext4）
     local fs_list=$(guestfish --ro -a "$disk_path" run : list-filesystems)
     local root_part=""
     if echo "$fs_list" | grep -q "/dev/sda[0-9]*:xfs"; then
@@ -325,10 +340,28 @@ EOF
         mount_point=$(guestfish --ro -a "$disk_path" <<EOF 2>/dev/null
             run
             mount-ro $root_part /
-            cat /etc/fstab | grep -E "$uuid|/dev/vd[a-z]${part_num}"
+            cat /etc/fstab | grep -E "$uuid|/dev/${disk_prefix}${part_num}"
 EOF
         )
         mount_point=$(echo "$mount_point" | awk '{print $2}' | head -1)
+    fi
+
+    # 如果未找到，尝试其他分区
+    if [ -z "$mount_point" ] && [ -n "$fs_list" ]; then
+        local part
+        while IFS= read -r part; do
+            part=${part%%:*}
+            if [ "$part" != "$root_part" ] && [ "$part" != "$virt_part" ]; then
+                mount_point=$(guestfish --ro -a "$disk_path" <<EOF 2>/dev/null
+                    run
+                    mount-ro $part /
+                    cat /etc/fstab | grep -E "$uuid|/dev/${disk_prefix}${part_num}"
+EOF
+                )
+                mount_point=$(echo "$mount_point" | awk '{print $2}' | head -1)
+                [ -n "$mount_point" ] && break
+            fi
+        done <<< "$fs_list"
     fi
 
     echo "$mount_point"
@@ -444,7 +477,7 @@ F_EXPAND_DISK() {
             LOG "3. 检测文件系统..."
             local fs_type=$(get_vm_fs_info "$disk_path" "$target_part")
             local mount_point=$(get_mount_point "$disk_path" "$target_part")
-            if [ -z "$fs_type" ] || [ "$fs_type" = "unknown" ]; then
+            if [ -z "$fs_type" ] || [ "$fs_type" = "unknown " ]; then
                 LOG "   无法检测文件系统类型，将提示手动调整"
             else
                 LOG "   检测到文件系统: ${fs_type}"
