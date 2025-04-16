@@ -5,7 +5,7 @@
 # Test On: Rocky Linux 9
 # Updated By: Grok 3 (xAI)
 # Update Date: 2025-04-16
-# Version: 1.1.11
+# Version: 1.1.12
 #############################################################################
 
 # sh
@@ -15,7 +15,7 @@ cd ${SH_PATH}
 
 # 脚本名称和版本
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.1.11"
+VERSION="1.1.12"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -38,20 +38,20 @@ fi
 LOG() {
     if [ "$QUIET" != "yes" ]; then
         echo -e "${GREEN}[$(date "+%H:%M:%S")] ${SH_NAME}: $*${NC}"
-        echo "[$(date "+%Y-%m-%d %H:%M:%S")] ${SH_NAME}: $*" | sed 's/\x1B\[[0-9;]*m//g' >> "$LOG_FILE"
+        echo "[$(date "+%Y-%m-%d %H:%M:%S")] ${SH_NAME}: $*" >> "$LOG_FILE"
     fi
 }
 
 ERROR() {
     echo -e "${RED}[$(date "+%H:%M:%S")] ${SH_NAME}: $*${NC}" >&2
-    echo "[$(date "+%Y-%m-%d %H:%M:%S")] ${SH_NAME}: ERROR: $*" | sed 's/\x1B\[[0-9;]*m//g' >> "$LOG_FILE"
+    echo "[$(date "+%Y-%m-%d %H:%M:%S")] ${SH_NAME}: ERROR: $*" >> "$LOG_FILE"
     exit 1
 }
 
 WARN() {
     if [ "$QUIET" != "yes" ]; then
         echo -e "${YELLOW}[$(date "+%H:%M:%S")] ${SH_NAME}: $*${NC}"
-        echo "[$(date "+%Y-%m-%d %H:%M:%S")] ${SH_NAME}: WARN: $*" | sed 's/\x1B\[[0-9;]*m//g' >> "$LOG_FILE"
+        echo "[$(date "+%Y-%m-%d %H:%M:%S")] ${SH_NAME}: WARN: $*" >> "$LOG_FILE"
     fi
 }
 
@@ -259,7 +259,7 @@ F_CHECK_DISK() {
             guestfish --ro -a "$disk_path" run : list-filesystems
             LOG "开始磁盘健康检查..."
             if qemu-img check "$disk_path" | grep -q "No errors"; then
-                LOG "磁盘健康状态: ${GREEN}正常${NC}"
+                LOG "磁盘健康状态: 正常"
             else
                 WARN "磁盘健康检查发现问题："
                 qemu-img check "$disk_path"
@@ -477,7 +477,7 @@ F_EXPAND_DISK() {
             LOG "3. 检测文件系统..."
             local fs_type=$(get_vm_fs_info "$disk_path" "$target_part")
             local mount_point=$(get_mount_point "$disk_path" "$target_part")
-            if [ -z "$fs_type" ] || [ "$fs_type" = "unknown " ]; then
+            if [ -z "$fs_type" ] || [ "$fs_type" = "unknown" ]; then
                 LOG "   无法检测文件系统类型，将提示手动调整"
             else
                 LOG "   检测到文件系统: ${fs_type}"
@@ -486,11 +486,7 @@ F_EXPAND_DISK() {
                         LOG "   将执行: resize2fs ${target_part}"
                         ;;
                     xfs)
-                        if [ -n "$mount_point" ]; then
-                            LOG "   将提示在虚拟机内执行: xfs_growfs ${mount_point}"
-                        else
-                            LOG "   将提示在虚拟机内执行: xfs_growfs <挂载点>"
-                        fi
+                        LOG "   将提示在虚拟机内执行: xfs_growfs ${mount_point:-<挂载点>}"
                         ;;
                     swap)
                         LOG "   SWAP 分区无需调整文件系统"
@@ -562,6 +558,8 @@ F_EXPAND_DISK() {
     LOG "[3/3] 正在检测文件系统..."
     local fs_type=$(get_vm_fs_info "$disk_path" "$target_part")
     local mount_point=$(get_mount_point "$disk_path" "$target_part")
+    local part_num="${target_part##*[a-z]}"
+    local resize_part="/dev/sda${part_num}"
 
     if [ -z "$fs_type" ] || [ "$fs_type" = "unknown" ]; then
         WARN "无法检测文件系统类型！"
@@ -575,7 +573,7 @@ F_EXPAND_DISK() {
     LOG "检测到文件系统: ${fs_type}"
     case "$fs_type" in
         ext[234])
-            # 检查文件系统是否已扩展
+            # 检查文件系统大小
             local fs_size=$(guestfish --ro -a "$disk_path" <<EOF 2>/dev/null
                 run
                 dumpe2fs $resize_part | grep "Block count"
@@ -583,19 +581,47 @@ EOF
             )
             fs_size=$(echo "$fs_size" | awk '{print $3}')
             local disk_size_bytes=$(qemu-img info "$disk_path" | awk -F'[ ()]' '/virtual size/ {print $6}')
-            if [ -n "$fs_size" ] && [ "$fs_size" -ge $((disk_size_bytes/4096-1000)) ]; then
-                LOG "ext4 文件系统已自动扩展，无需手动调整。"
+            local block_size=$(guestfish --ro -a "$disk_path" <<EOF 2>/dev/null
+                run
+                dumpe2fs $resize_part | grep "Block size"
+EOF
+            )
+            block_size=$(echo "$block_size" | awk '{print $3}')
+            if [ -n "$fs_size" ] && [ -n "$block_size" ]; then
+                local fs_size_bytes=$((fs_size * block_size))
+                if [ "$fs_size_bytes" -ge $((disk_size_bytes - 1024*1024*1024)) ]; then
+                    LOG "ext${fs_type##ext} 文件系统已扩展，无需手动调整。"
+                else
+                    WARN "ext${fs_type##ext} 文件系统需调整，请启动虚拟机后执行："
+                    WARN "  resize2fs $target_part"
+                fi
             else
-                WARN "ext 文件系统需在虚拟机内调整，请启动虚拟机后执行："
+                WARN "无法获取 ext${fs_type##ext} 文件系统大小，请启动虚拟机后执行："
                 WARN "  resize2fs $target_part"
             fi
             ;;
         xfs)
-            WARN "XFS 文件系统需在虚拟机内调整，请启动虚拟机后执行："
-            if [ -n "$mount_point" ]; then
-                WARN "  xfs_growfs $mount_point"
+            # 检查 XFS 大小
+            local xfs_info=$(guestfish --ro -a "$disk_path" <<EOF 2>/dev/null
+                run
+                mount-ro $resize_part /
+                xfs_info /
+EOF
+            )
+            local xfs_blocks=$(echo "$xfs_info" | grep "blocksize" | grep -o "blocks=[0-9]*" | cut -d'=' -f2)
+            local xfs_blocksize=$(echo "$xfs_info" | grep "blocksize" | grep -o "bsize=[0-9]*" | cut -d'=' -f2)
+            if [ -n "$xfs_blocks" ] && [ -n "$xfs_blocksize" ]; then
+                local xfs_size_bytes=$((xfs_blocks * xfs_blocksize))
+                local disk_size_bytes=$(qemu-img info "$disk_path" | awk -F'[ ()]' '/virtual size/ {print $6}')
+                if [ "$xfs_size_bytes" -ge $((disk_size_bytes - 1024*1024*1024)) ]; then
+                    LOG "XFS 文件系统已扩展，无需手动调整。"
+                else
+                    WARN "XFS 文件系统需调整，请启动虚拟机后执行："
+                    WARN "  xfs_growfs ${mount_point:-<挂载点>}"
+                fi
             else
-                WARN "  xfs_growfs <挂载点>"
+                WARN "无法获取 XFS 文件系统大小，请启动虚拟机后执行："
+                WARN "  xfs_growfs ${mount_point:-<挂载点>}"
             fi
             ;;
         swap)
