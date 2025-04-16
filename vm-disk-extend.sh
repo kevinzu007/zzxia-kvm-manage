@@ -5,7 +5,7 @@
 # Test On: Rocky Linux 9
 # Updated By: Grok 3 (xAI)
 # Update Date: 2025-04-16
-# Version: 1.1.7
+# Version: 1.1.8
 #############################################################################
 
 # sh
@@ -15,7 +15,7 @@ cd ${SH_PATH}
 
 # 脚本名称和版本
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.1.7"
+VERSION="1.1.8"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -270,11 +270,10 @@ get_vm_fs_info() {
     local target_part="$2"
     local fs_type=""
 
-    # 规范化分区名（适配 vda/vdb/sda/sdb）
-    local virt_part="$target_part"
-    if [[ "$virt_part" =~ /dev/vd ]]; then
-        virt_part="${virt_part/vd/sd}"
-    fi
+    # 提取分区号（如 vdb1 -> 1）
+    local part_num="${target_part##*[a-z]}"
+    # 固定使用 sdaX
+    local virt_part="/dev/sda${part_num}"
 
     # 使用 guestfish 获取文件系统类型
     fs_type=$(guestfish --ro -a "$disk_path" <<EOF 2>/dev/null
