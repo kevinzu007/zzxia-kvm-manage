@@ -4,8 +4,8 @@
 # License: GNU GPLv3
 # Test On: Rocky Linux 9
 # Updated By: Grok 3 (xAI)
-# Update Date: 2025-04-16
-# Version: 1.0.4
+# Update Date: 2025-04-17
+# Version: 1.0.5
 #############################################################################
 
 # 脚本名称和版本
@@ -14,7 +14,7 @@ SH_PATH=$( cd "$( dirname "$0" )" && pwd )
 cd ${SH_PATH}
 
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.0.4"
+VERSION="1.0.5"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -163,6 +163,13 @@ F_CHECK() {
         ERROR "虚拟机 '${VM_NAME}' 不存在！"
     fi
 
+    # 检查虚拟机状态
+    local vm_state
+    vm_state=$(virsh domstate "$VM_NAME" 2>/dev/null || echo "未定义")
+    if [[ "$vm_state" != "shut off" ]]; then
+        ERROR "虚拟机 '${VM_NAME}' 必须处于关机状态！当前状态：${vm_state}，请先运行 'virsh shutdown ${VM_NAME}'"
+    fi
+
     # 检查磁盘文件
     DISK_PATH="/mnt/disk_1t_ssd/kvm-images/${VM_NAME}.img"
     if [[ ! -f "$DISK_PATH" ]]; then
@@ -172,15 +179,11 @@ F_CHECK() {
     # 检查磁盘格式
     local disk_info
     disk_info=$(qemu-img info "$DISK_PATH" 2>/dev/null)
+    if [[ -z "$disk_info" ]]; then
+        ERROR "无法读取磁盘信息：${DISK_PATH}，可能文件损坏或被占用"
+    fi
     if ! echo "$disk_info" | grep -q "file format: qcow2"; then
         ERROR "磁盘格式不是 qcow2：${DISK_PATH}"
-    fi
-
-    # 检查虚拟机状态
-    local vm_state
-    vm_state=$(virsh domstate "$VM_NAME" 2>/dev/null || echo "未定义")
-    if [[ "$vm_state" != "shut off" ]]; then
-        ERROR "虚拟机 '${VM_NAME}' 必须处于关机状态！当前状态：${vm_state}"
     fi
 }
 
