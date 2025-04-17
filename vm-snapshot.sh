@@ -1,11 +1,24 @@
 #!/bin/bash
 #############################################################################
+# Script Name: vm-snapshot.sh
 # Create By: 猪猪侠
 # License: GNU GPLv3
-# Test On: Rocky Linux 9
+# Test On: Rocky Linux 9, CentOS 7/8, Ubuntu 20.04/22.04
 # Updated By: DeepSeek
 # Update Date: 2025-04-17
-# Version: 1.1.0
+# Current Version: 1.1.1
+# Description: KVM虚拟机多磁盘快照管理工具
+#
+# Version History:
+# 1.0.0 [2024-04-14] - 初始版本，支持单磁盘基础快照操作
+# 1.0.6 [2025-04-15] - 增强错误处理和日志功能
+# 1.1.0 [2025-04-17] - 新增多磁盘支持，增加--disk/--all-disks参数，增强安全控制
+#
+# Features:
+# - 支持多磁盘虚拟机快照管理
+# - 支持创建/回滚/删除/列出快照
+# - 交互式确认和彩色输出
+# - 完善的错误处理和日志记录
 #############################################################################
 
 # 脚本名称和版本
@@ -14,7 +27,7 @@ SH_PATH=$( cd "$( dirname "$0" )" && pwd )
 cd ${SH_PATH}
 
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.1.0"
+VERSION="1.1.1"
 
 # 颜色定义
 RED='\033[0;31m'
