@@ -3,9 +3,9 @@
 # Create By: 猪猪侠
 # License: GNU GPLv3
 # Test On: Rocky Linux 9
-# Updated By: Grok 3 (xAI)
+# Updated By: DeepSeek
 # Update Date: 2025-04-17
-# Version: 1.0.6
+# Version: 1.1.0
 #############################################################################
 
 # 脚本名称和版本
@@ -14,12 +14,13 @@ SH_PATH=$( cd "$( dirname "$0" )" && pwd )
 cd ${SH_PATH}
 
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.0.6"
+VERSION="1.1.0"
 
 # 颜色定义
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # 无颜色
 
 # 日志文件
@@ -82,6 +83,57 @@ F_CHECK_DEPS() {
     done
 }
 
+# 获取虚拟机所有磁盘路径
+F_GET_DISKS() {
+    local vm_name=$1
+    virsh domblklist "$vm_name" --details | awk '/disk/ {print $4}' | sort -u
+}
+
+# 检查虚拟机和磁盘
+F_CHECK() {
+    # 检查虚拟机存在
+    if ! virsh list --all --name | grep -q "^${VM_NAME}$"; then
+        ERROR "虚拟机 '${VM_NAME}' 不存在！"
+    fi
+
+    # 检查虚拟机状态
+    local vm_state
+    vm_state=$(virsh domstate "$VM_NAME" 2>/dev/null || echo "未定义")
+    if [[ "$vm_state" != "shut off" ]]; then
+        ERROR "虚拟机 '${VM_NAME}' 必须处于关机状态！当前状态：${vm_state}，请先运行 'virsh shutdown ${VM_NAME}'"
+    fi
+
+    # 获取磁盘列表
+    if [[ -n "$SPECIFIC_DISK" ]]; then
+        DISK_PATHS=("$SPECIFIC_DISK")
+    else
+        DISK_PATHS=()
+        while IFS= read -r disk; do
+            if [[ ! -e "$disk" ]]; then
+                WARN "磁盘文件不存在：${disk}，跳过此磁盘"
+                continue
+            fi
+            
+            local disk_info
+            disk_info=$(qemu-img info "$disk" 2>/dev/null)
+            if [[ -z "$disk_info" ]]; then
+                WARN "无法读取磁盘信息：${disk}，可能文件损坏或被占用，跳过此磁盘"
+                continue
+            fi
+            if ! echo "$disk_info" | grep -q "file format: qcow2"; then
+                WARN "磁盘格式不是 qcow2：${disk}，跳过此磁盘"
+                continue
+            fi
+            
+            DISK_PATHS+=("$disk")
+        done < <(F_GET_DISKS "$VM_NAME")
+    fi
+
+    if [[ ${#DISK_PATHS[@]} -eq 0 ]]; then
+        ERROR "没有找到可用的qcow2格式磁盘！"
+    fi
+}
+
 # 显示帮助信息
 F_HELP() {
     echo -e "
@@ -93,6 +145,10 @@ ${RED}不支持的类型：${NC}
     * RBD/CEPH存储
     * iSCSI存储
     * 其他网络存储
+${GREEN}多磁盘支持：${NC}
+    * 默认操作所有磁盘
+    * 可使用 --disk 指定单个磁盘
+    * 可使用 --all-disks 显式操作所有磁盘
 ${GREEN}依赖：${NC}
     * qemu-img
     * virsh
@@ -114,10 +170,10 @@ ${GREEN}参数语法规范：${NC}
 ${GREEN}用法：${NC}
     $0 -h|--help                                        #-- 显示帮助
     $0 -v|--version                                     #-- 显示版本
-    $0 -l|--list {-n|--name <虚拟机名称>}               #-- 列出快照
-    $0 {-c|--create <快照名称>} {-n|--name <虚拟机名称>}    #-- 创建快照
-    $0 {-r|--revert <快照名称>} {-n|--name <虚拟机名称>}    #-- 回滚快照
-    $0 {-d|--delete <快照名称>} {-n|--name <虚拟机名称>}    #-- 删除快照
+    $0 -l|--list {-n|--name <虚拟机名称>} [--disk <磁盘路径>] #-- 列出快照
+    $0 {-c|--create <快照名称>} {-n|--name <虚拟机名称>} [--disk <磁盘路径>] #-- 创建快照
+    $0 {-r|--revert <快照名称>} {-n|--name <虚拟机名称>} [--disk <磁盘路径>] #-- 回滚快照
+    $0 {-d|--delete <快照名称>} {-n|--name <虚拟机名称>} [--disk <磁盘路径>] #-- 删除快照
 ${GREEN}参数说明：${NC}
     -h|--help           显示此帮助信息
     -v|--version        显示脚本版本
@@ -126,15 +182,21 @@ ${GREEN}参数说明：${NC}
     -r|--revert         回滚到指定快照（需提供快照名称）
     -d|--delete         删除指定快照（需提供快照名称）
     -l|--list           列出虚拟机磁盘的所有快照
+    --disk              指定要操作的单个磁盘路径
+    --all-disks         显式指定操作所有磁盘（默认行为）
+    --force             跳过部分安全检查
     <虚拟机名称>        KVM虚拟机名称
     <快照名称>          快照的名称（如 before_extend_20250416）
+    <磁盘路径>          磁盘文件的完整路径
 ${GREEN}使用示例：${NC}
     $0 -h                                # 显示帮助信息
     $0 -v                                # 显示版本信息
-    $0 -c -n vm1 snap1                   # 为【vm1】创建快照【snap1】
-    $0 -r -n vm1 snap1                   # 将【vm1】回滚到快照【snap1】
-    $0 -d -n vm1 snap1                   # 删除【vm1】的快照【snap1】
+    $0 -c snap1 -n vm1                   # 为【vm1】所有磁盘创建快照【snap1】
+    $0 -c snap1 -n vm1 --disk /path/to/disk1.img  # 为【vm1】的指定磁盘创建快照
+    $0 -r snap1 -n vm1                   # 将【vm1】所有磁盘回滚到快照【snap1】
+    $0 -d snap1 -n vm1 --disk /path/to/disk1.img  # 删除【vm1】指定磁盘的快照
     $0 -l -n vm1                         # 列出【vm1】的所有快照
+    $0 -l -n vm1 --disk /path/to/disk1.img # 列出【vm1】指定磁盘的快照
 "
 }
 
@@ -155,59 +217,31 @@ F_PROMPT() {
     fi
 }
 
-# 检查虚拟机和磁盘
-F_CHECK() {
-    # 检查虚拟机存在
-    if ! virsh list --all --name | grep -q "^${VM_NAME}$"; then
-        ERROR "虚拟机 '${VM_NAME}' 不存在！"
-    fi
-
-    # 检查虚拟机状态
-    local vm_state
-    vm_state=$(virsh domstate "$VM_NAME" 2>/dev/null || echo "未定义")
-    if [[ "$vm_state" != "shut off" ]]; then
-        ERROR "虚拟机 '${VM_NAME}' 必须处于关机状态！当前状态：${vm_state}，请先运行 'virsh shutdown ${VM_NAME}'"
-    fi
-
-    # 检查磁盘文件
-    DISK_PATH="/mnt/disk_1t_ssd/kvm-images/${VM_NAME}.img"
-    if [[ ! -f "$DISK_PATH" ]]; then
-        ERROR "磁盘文件不存在：${DISK_PATH}"
-    fi
-
-    # 检查磁盘格式
-    local disk_info
-    disk_info=$(qemu-img info "$DISK_PATH" 2>/dev/null)
-    if [[ -z "$disk_info" ]]; then
-        ERROR "无法读取磁盘信息：${DISK_PATH}，可能文件损坏或被占用"
-    fi
-    if ! echo "$disk_info" | grep -q "file format: qcow2"; then
-        ERROR "磁盘格式不是 qcow2：${DISK_PATH}"
-    fi
-}
-
 # 创建快照
 F_CREATE_SNAPSHOT() {
     echo -e "
 ${GREEN}快照操作摘要：${NC}
   虚拟机：${VM_NAME}
-  磁盘文件：${DISK_PATH}
   操作：创建快照
   快照名称：${SNAP_NAME}
+  目标磁盘：${#DISK_PATHS[@]}块
 ======================================"
-    LOG "快照操作摘要："
-    LOG "虚拟机：${VM_NAME}"
-    LOG "磁盘文件：${DISK_PATH}"
-    LOG "操作：创建快照"
-    LOG "快照名称：${SNAP_NAME}"
+    
+    for disk in "${DISK_PATHS[@]}"; do
+        echo -e "  - ${disk}"
+    done
+    
     F_PROMPT "请确认以上信息是否正确？"
 
-    LOG "正在创建快照 '${SNAP_NAME}' 于 ${DISK_PATH}..."
-    if ! qemu-img snapshot -c "$SNAP_NAME" "$DISK_PATH"; then
-        ERROR "创建快照 '${SNAP_NAME}' 失败！"
-    fi
-    LOG "快照 '${SNAP_NAME}' 创建成功"
-    echo -e "${GREEN}快照 '${SNAP_NAME}' 创建成功${NC}"
+    for disk in "${DISK_PATHS[@]}"; do
+        LOG "正在为磁盘 ${disk} 创建快照 '${SNAP_NAME}'..."
+        if ! qemu-img snapshot -c "$SNAP_NAME" "$disk"; then
+            ERROR "为磁盘 ${disk} 创建快照 '${SNAP_NAME}' 失败！"
+        fi
+        LOG "磁盘 ${disk} 快照 '${SNAP_NAME}' 创建成功"
+    done
+    
+    echo -e "${GREEN}所有磁盘快照 '${SNAP_NAME}' 创建成功${NC}"
 }
 
 # 回滚快照
@@ -215,23 +249,37 @@ F_REVERT_SNAPSHOT() {
     echo -e "
 ${GREEN}快照操作摘要：${NC}
   虚拟机：${VM_NAME}
-  磁盘文件：${DISK_PATH}
   操作：回滚快照
   快照名称：${SNAP_NAME}
+  目标磁盘：${#DISK_PATHS[@]}块
 ======================================"
-    LOG "快照操作摘要："
-    LOG "虚拟机：${VM_NAME}"
-    LOG "磁盘文件：${DISK_PATH}"
-    LOG "操作：回滚快照"
-    LOG "快照名称：${SNAP_NAME}"
+    
+    local missing_count=0
+    for disk in "${DISK_PATHS[@]}"; do
+        if ! qemu-img snapshot -l "$disk" | grep -q "$SNAP_NAME"; then
+            if [[ "$FORCE" != "yes" ]]; then
+                ERROR "磁盘 ${disk} 不存在快照 ${SNAP_NAME}"
+            else
+                WARN "磁盘 ${disk} 不存在快照 ${SNAP_NAME}，跳过此磁盘"
+                continue
+            fi
+        fi
+        echo -e "  - ${disk}"
+    done
+    
     F_PROMPT "请确认以上信息是否正确？"
 
-    LOG "正在回滚到快照 '${SNAP_NAME}' 于 ${DISK_PATH}..."
-    if ! qemu-img snapshot -a "$SNAP_NAME" "$DISK_PATH"; then
-        ERROR "回滚快照 '${SNAP_NAME}' 失败！"
-    fi
-    LOG "快照 '${SNAP_NAME}' 回滚成功"
-    echo -e "${GREEN}快照 '${SNAP_NAME}' 回滚成功${NC}"
+    for disk in "${DISK_PATHS[@]}"; do
+        if qemu-img snapshot -l "$disk" | grep -q "$SNAP_NAME"; then
+            LOG "正在回滚磁盘 ${disk} 到快照 '${SNAP_NAME}'..."
+            if ! qemu-img snapshot -a "$SNAP_NAME" "$disk"; then
+                ERROR "回滚磁盘 ${disk} 到快照 '${SNAP_NAME}' 失败！"
+            fi
+            LOG "磁盘 ${disk} 已成功回滚到快照 '${SNAP_NAME}'"
+        fi
+    done
+    
+    echo -e "${GREEN}所有磁盘已成功回滚到快照 '${SNAP_NAME}'${NC}"
 }
 
 # 删除快照
@@ -239,38 +287,58 @@ F_DELETE_SNAPSHOT() {
     echo -e "
 ${GREEN}快照操作摘要：${NC}
   虚拟机：${VM_NAME}
-  磁盘文件：${DISK_PATH}
   操作：删除快照
   快照名称：${SNAP_NAME}
+  目标磁盘：${#DISK_PATHS[@]}块
 ======================================"
-    LOG "快照操作摘要："
-    LOG "虚拟机：${VM_NAME}"
-    LOG "磁盘文件：${DISK_PATH}"
-    LOG "操作：删除快照"
-    LOG "快照名称：${SNAP_NAME}"
+    
+    local missing_count=0
+    for disk in "${DISK_PATHS[@]}"; do
+        if ! qemu-img snapshot -l "$disk" | grep -q "$SNAP_NAME"; then
+            if [[ "$FORCE" != "yes" ]]; then
+                ERROR "磁盘 ${disk} 不存在快照 ${SNAP_NAME}"
+            else
+                WARN "磁盘 ${disk} 不存在快照 ${SNAP_NAME}，跳过此磁盘"
+                continue
+            fi
+        fi
+        echo -e "  - ${disk}"
+    done
+    
     F_PROMPT "请确认以上信息是否正确？"
 
-    LOG "正在删除快照 '${SNAP_NAME}' 从 ${DISK_PATH}..."
-    if ! qemu-img snapshot -d "$SNAP_NAME" "$DISK_PATH"; then
-        ERROR "删除快照 '${SNAP_NAME}' 失败！"
-    fi
-    LOG "快照 '${SNAP_NAME}' 删除成功"
-    echo -e "${GREEN}快照 '${SNAP_NAME}' 删除成功${NC}"
+    for disk in "${DISK_PATHS[@]}"; do
+        if qemu-img snapshot -l "$disk" | grep -q "$SNAP_NAME"; then
+            LOG "正在删除磁盘 ${disk} 的快照 '${SNAP_NAME}'..."
+            if ! qemu-img snapshot -d "$SNAP_NAME" "$disk"; then
+                ERROR "删除磁盘 ${disk} 的快照 '${SNAP_NAME}' 失败！"
+            fi
+            LOG "磁盘 ${disk} 的快照 '${SNAP_NAME}' 已删除"
+        fi
+    done
+    
+    echo -e "${GREEN}所有磁盘的快照 '${SNAP_NAME}' 已删除${NC}"
 }
 
 # 列出快照
 F_LIST_SNAPSHOTS() {
-    LOG "正在列出 ${DISK_PATH} 的快照..."
-    local snapshots
-    snapshots=$(qemu-img snapshot -l "$DISK_PATH" 2>/dev/null) || ERROR "列出快照失败！"
-    if [[ -z "$snapshots" ]]; then
-        LOG "未找到快照"
-        echo -e "${YELLOW}未找到快照${NC}"
-    else
-        LOG "快照列表："
-        echo -e "${GREEN}快照列表：${NC}"
-        echo "$snapshots" | tee -a "$LOG_FILE"
-    fi
+    echo -e "${GREEN}列出虚拟机 ${VM_NAME} 的快照${NC}"
+    local has_snapshots=0
+    
+    for disk in "${DISK_PATHS[@]}"; do
+        echo -e "\n${BLUE}磁盘: ${disk}${NC}"
+        local snapshots
+        snapshots=$(qemu-img snapshot -l "$disk" 2>/dev/null)
+        
+        if [[ -z "$snapshots" ]]; then
+            echo -e "${YELLOW}未找到快照${NC}"
+        else
+            has_snapshots=1
+            echo "$snapshots" | awk 'NR>2' # 跳过qcow2输出的表头
+        fi
+    done
+    
+    [[ $has_snapshots -eq 0 ]] && echo -e "${YELLOW}所有磁盘均未找到快照${NC}"
 }
 
 # 主函数
@@ -303,7 +371,7 @@ F_MAIN() {
 }
 
 # 解析参数
-TEMP=$(getopt -o n:c:r:d:lhv --long name:,create:,revert:,delete:,list,help,version -- "$@")
+TEMP=$(getopt -o n:c:r:d:lhv --long name:,create:,revert:,delete:,list,help,version,disk:,all-disks,force -- "$@")
 if [[ $? -ne 0 ]]; then
     ERROR "解析参数失败！"
 fi
@@ -313,6 +381,8 @@ VM_NAME=""
 SNAP_NAME=""
 ACTION=""
 QUIET="no"
+SPECIFIC_DISK=""
+FORCE="no"
 
 while true; do
     case "$1" in
@@ -352,6 +422,21 @@ while true; do
                 ERROR "不能同时指定多个操作！仅支持 -c|-r|-d|-l 之一"
             fi
             ACTION="list"
+            shift
+            ;;
+        --disk)
+            if [[ -n "$SPECIFIC_DISK" ]]; then
+                ERROR "磁盘路径只能指定一次！"
+            fi
+            SPECIFIC_DISK="$2"
+            shift 2
+            ;;
+        --all-disks)
+            SPECIFIC_DISK="" # 显式要求操作所有磁盘
+            shift
+            ;;
+        --force)
+            FORCE="yes"
             shift
             ;;
         -h|--help)
