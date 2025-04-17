@@ -5,7 +5,7 @@
 # Test On: Rocky Linux 9
 # Updated By: Grok 3 (xAI)
 # Update Date: 2025-04-17
-# Version: 1.0.5
+# Version: 1.0.6
 #############################################################################
 
 # 脚本名称和版本
@@ -14,7 +14,7 @@ SH_PATH=$( cd "$( dirname "$0" )" && pwd )
 cd ${SH_PATH}
 
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.0.5"
+VERSION="1.0.6"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -141,7 +141,6 @@ ${GREEN}使用示例：${NC}
 # 显示版本信息
 F_VERSION() {
     echo -e "${GREEN}${SCRIPT_NAME} ${VERSION}${NC}"
-    LOG "${SCRIPT_NAME} ${VERSION}"
 }
 
 # 提示用户确认
