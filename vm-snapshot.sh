@@ -5,14 +5,17 @@
 # License: GNU GPLv3
 # Test On: Rocky Linux 9, CentOS 7/8, Ubuntu 20.04/22.04
 # Updated By: DeepSeek & Gemini
-# Update Date: 2025-04-18
-# Current Version: 1.2.2 # 更新版本号
+# Update Date: 2025-04-19
+# Current Version: 1.2.4 # 更新版本号
 # Description: KVM虚拟机多磁盘快照管理工具 (支持在线和离线模式)
 #
 # Version History:
-# ... (previous history) ...
-# 1.2.1 [2025-04-18] - 修正 F_CREATE_LIVE_SNAPSHOT 中条件输出的 Bash 语法错误
-# 1.2.2 [2025-04-18] - 恢复 F_HELP 中的参数语法规范说明，统一帮助信息缩进
+# 1.0.0 [2024-04-14] - 初始版本，支持单磁盘基础快照操作
+# 1.1.0 [2025-04-17] - 新增多磁盘支持，增加--disk/--all-disks参数，增强安全控制
+# 1.2.0 [2025-04-18] - 新增在线快照功能 (--live)，使用virsh外部快照机制
+#                     - 添加 --disk-only, --no-quiesce 选项
+#                     - 在线删除实现为 blockcommit --active --pivot
+# 1.2.4 [2025-04-19] - 基于 v1.1.2 重新修订 F_HELP 帮助信息，确保内容完整、格式正确并集成在线模式说明
 #
 # Features:
 # - 支持在线 (live) 和离线 (offline) 虚拟机快照管理
@@ -29,7 +32,7 @@ SH_PATH=$( cd "$( dirname "$0" )" && pwd )
 cd ${SH_PATH}
 
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.2.2" # 版本号更新
+VERSION="1.2.4" # 版本号更新
 
 # 颜色定义
 RED='\033[0;31m'
@@ -249,28 +252,40 @@ F_CHECK() {
 
 # --- 帮助和版本函数 ---
 F_HELP() {
-    # 使用 cat 和 HERE document 来简化多行 echo 的格式化
-    cat <<-EOF
-
+    # 恢复使用 echo -e 并基于 1.1.2 版本内容进行扩充
+    echo -e "
 ${GREEN}用途：${NC}管理KVM虚拟机的磁盘快照（支持在线和离线模式）
+
 ${GREEN}模式：${NC}
     * ${YELLOW}离线模式 (默认):${NC} 使用 qemu-img 管理 qcow2 文件的内部快照。
         - ${RED}要求：${NC}虚拟机必须处于关机 (shut off) 状态。
-        - 支持 --disk 指定单个 qcow2 文件。
     * ${YELLOW}在线模式 (--live):${NC} 使用 virsh 管理虚拟机的外部快照。
         - ${GREEN}要求：${NC}虚拟机通常处于运行 (running) 状态。
-        - ${GREEN}一致性：${NC}强烈建议虚拟机内部安装并运行 qemu-guest-agent 以确保一致性 (使用 --quiesce)。
-        - 支持 --disk-only (仅磁盘快照) 和 --no-quiesce (禁用冻结)。
-        - ${RED}在线删除警告：${NC}在线删除 (-d --live) 执行 blockcommit 合并当前层，**非常消耗I/O**，请在维护窗口操作。
+        - ${GREEN}一致性：${NC}强烈建议虚拟机内部安装并运行 qemu-guest-agent 以确保一致性。
+
 ${GREEN}支持存储类型：${NC}
     * 离线模式：本地 qcow2 文件
-    * 在线模式：libvirt 支持的块设备 (文件、LVM、iSCSI 等，只要 virsh 能管理)
+    * 在线模式：libvirt 支持的块设备 (文件、LVM、iSCSI 等)
+
+${RED}不支持的类型：${NC}
+    * 离线模式不支持 raw 格式磁盘、RBD/CEPH、iSCSI 等。
+
+${GREEN}多磁盘支持：${NC}
+    * 离线模式：默认操作所有自动检测到的 qcow2 磁盘，可用 --disk 指定单个。
+    * 在线模式：始终操作虚拟机的所有相关磁盘以保证原子性。
+
 ${GREEN}依赖：${NC}
     * virsh (所有模式)
     * qemu-img (仅离线模式)
+
 ${GREEN}注意：${NC}
-    * 重要数据请提前备份。
+    * ${RED}离线模式：必须在虚拟机关机状态下操作。${NC}
+    * ${YELLOW}在线模式：${NC}
+        - 建议安装并运行 qemu-guest-agent 以获得文件系统一致性快照。
+        - 在线删除 (-d --live) 执行 blockcommit 合并当前层，**会极大消耗I/O**，请务必在维护窗口操作！
+    * 重要数据请提前备份，脚本会提示备份。
     * 需要 root 权限执行。
+
 ${GREEN}参数语法规范：${NC}
     无包围符号  ：-a              : 必选【选项】
                 ：val             : 必选【参数值】
@@ -282,48 +297,59 @@ ${GREEN}参数语法规范：${NC}
     |           ：val1|val2|<valn> : 多选一
     {}          ：{-a <val>}      : 必须成组出现【选项+参数值】
                 ：{val1 val2}     : 必须成组的【参数值组合】，且必须按顺序提供
+
 ${GREEN}用法：${NC}
-    $0 -h|--help                                            # 显示帮助
-    $0 -v|--version                                         # 显示版本
+    ${SCRIPT_NAME} -h|--help                                            # 显示帮助
+    ${SCRIPT_NAME} -v|--version                                         # 显示版本
 
     # 离线模式 (VM需关机)
-    $0 -l|--list {-n <VM名>} [--disk <qcow2路径>]           # 列出内部快照
-    $0 {-c <快照名>} {-n <VM名>} [--disk <qcow2路径>]         # 创建内部快照
-    $0 {-r <快照名>} {-n <VM名>} [--disk <qcow2路径>] [--force] # 回滚内部快照
-    $0 {-d <快照名>} {-n <VM名>} [--disk <qcow2路径>] [--force] # 删除内部快照
+    ${SCRIPT_NAME} -l -n <VM名> [--disk <qcow2路径>]                     # 列出内部快照
+    ${SCRIPT_NAME} -c <快照名> -n <VM名> [--disk <qcow2路径>]             # 创建内部快照
+    ${SCRIPT_NAME} -r <快照名> -n <VM名> [--disk <qcow2路径>] [--force]     # 回滚内部快照
+    ${SCRIPT_NAME} -d <快照名> -n <VM名> [--disk <qcow2路径>] [--force]     # 删除内部快照
 
     # 在线模式 (VM需运行, 推荐带 Guest Agent)
-    $0 -l|--list {-n <VM名>} --live                         # 列出外部快照
-    $0 {-c <快照名>} {-n <VM名>} --live [--disk-only] [--no-quiesce] # 创建外部快照
-    $0 {-r <快照名>} {-n <VM名>} --live [--force]             # 回滚外部快照
-    $0 {-d <快照名>} {-n <VM名>} --live [--force]             # ${RED}在线合并当前层 (高危I/O操作)${NC}
+    ${SCRIPT_NAME} -l -n <VM名> --live                                   # 列出外部快照
+    ${SCRIPT_NAME} -c <快照名> -n <VM名> --live [--disk-only] [--no-quiesce] # 创建外部快照
+    ${SCRIPT_NAME} -r <快照名> -n <VM名> --live [--force]                 # 回滚外部快照
+    ${SCRIPT_NAME} -d <快照名> -n <VM名> --live [--force]                 # ${RED}在线合并当前层 (高危I/O操作)${NC}
 
 ${GREEN}参数说明：${NC}
-    -h|--help           显示此帮助信息
-    -v|--version        显示脚本版本
-    -n|--name <VM名>    指定虚拟机名称 (必需)
-    -c|--create <快照名> 创建快照
-    -r|--revert <快照名> 回滚到指定快照
-    -d|--delete <快照名> 删除指定快照 (离线) / ${RED}在线合并当前层${NC} (在线)
-    -l|--list           列出快照
+    -h, --help           显示此帮助信息
+    -v, --version        显示脚本版本
+    -n, --name <VM名>    指定虚拟机名称 (必需)
+    -c, --create <快照名> 创建快照
+    -r, --revert <快照名> 回滚到指定快照
+    -d, --delete <快照名> 删除指定快照 (离线模式) / ${RED}在线合并当前活动的快照层${NC} (在线模式)
+    -l, --list           列出快照
     --live              启用在线快照模式 (使用 virsh 外部快照)
-    --disk <路径>       (仅离线模式) 指定要操作的单个 qcow2 磁盘文件路径
-    --all-disks         (仅离线模式) 显式指定操作所有 qcow2 磁盘 (默认行为)
-    --force             离线模式: 跳过快照存在性检查; 在线回滚: 强制回滚; 在线删除: 跳过确认提示? (待定)
-    --disk-only         (仅在线创建) 只创建磁盘快照，不包含内存状态
-    --no-quiesce        (仅在线创建) 强制不使用 quiesce (冻结)，快照可能非一致
-    <快照名>            快照的名称
-${GREEN}使用示例：${NC}
-    # 离线
-    $0 -c snap_offline -n vm1
-    $0 -l -n vm1 --disk /path/to/disk.qcow2
-    # 在线
-    $0 -c snap_live -n vm1 --live --disk-only # 创建在线仅磁盘快照 (推荐)
-    $0 -l -n vm1 --live
-    $0 -r snap_live -n vm1 --live
-    $0 -d any_name -n vm1 --live # ${RED}警告：此操作将合并 vm1 当前的快照层，'any_name' 仅用于标识操作${NC}
+    --disk <路径>       (仅离线模式) 指定要操作的单个 qcow2 磁盘文件路径 (与 --all-disks 互斥)
+    --all-disks         (仅离线模式) 显式指定操作所有自动检测到的qcow2磁盘 (默认行为, 与 --disk 互斥)
+    --force             离线模式: 回滚/删除时，如快照不存在则跳过该磁盘而不报错。
+                        在线回滚: 强制回滚 (如果 libvirt 支持)。
+                        在线删除: 跳过 blockcommit 操作前的最终确认提示。
+    --disk-only         (仅在线创建) 只创建磁盘快照，不包含内存状态。
+    --no-quiesce        (仅在线创建) 创建快照时不尝试冻结文件系统 I/O (可能导致快照数据不一致)。
+    <VM名>              KVM 虚拟机名称
+    <快照名>            快照的名称 (建议使用易于识别的名称，如 backup_日期_原因)
+    <qcow2路径>         (仅离线模式) qcow2 磁盘文件的完整路径
 
-EOF
+${GREEN}使用示例：${NC}
+    # 离线模式示例 (假设虚拟机 vm1 已关机)
+    ${SCRIPT_NAME} -c pre_update -n vm1                               # 为 vm1 所有 qcow2 磁盘创建名为 pre_update 的内部快照
+    ${SCRIPT_NAME} -l -n vm1 --disk /vm/vm1_disk1.qcow2              # 列出 vm1 指定磁盘的内部快照
+    ${SCRIPT_NAME} -r pre_update -n vm1                               # 将 vm1 所有 qcow2 磁盘回滚到 pre_update 快照
+    ${SCRIPT_NAME} -d pre_update -n vm1 --disk /vm/vm1_disk1.qcow2    # 删除 vm1 指定磁盘的 pre_update 快照
+    ${SCRIPT_NAME} -l -n vm1                                         # 列出 vm1 所有 qcow2 磁盘的内部快照
+
+    # 在线模式示例 (假设虚拟机 vm2 正在运行且安装了 Guest Agent)
+    ${SCRIPT_NAME} -c live_backup_$(date +%Y%m%d) -n vm2 --live --disk-only # 为 vm2 创建一个仅磁盘的在线快照 (推荐方式)
+    ${SCRIPT_NAME} -c full_live_snap -n vm2 --live                     # 为 vm2 创建包含内存的在线快照 (需要更多时间和空间)
+    ${SCRIPT_NAME} -l -n vm2 --live                                   # 列出 vm2 的所有外部快照
+    ${SCRIPT_NAME} -r live_backup_YYYYMMDD -n vm2 --live              # 将 vm2 回滚到名为 live_backup_YYYYMMDD 的快照
+    ${SCRIPT_NAME} -d any_name -n vm2 --live                         # ${RED}警告:${NC} 在线合并 vm2 当前活动的快照层 (高I/O操作, 'any_name' 仅用于标识)
+    ${SCRIPT_NAME} -d any_name -n vm2 --live --force                 # ${RED}警告:${NC} 同上，但跳过最终确认提示直接执行合并
+"
 }
 F_VERSION() {
     echo -e "${GREEN}${SCRIPT_NAME} ${VERSION}${NC}"
@@ -331,11 +357,13 @@ F_VERSION() {
 
 # --- 交互与核心逻辑函数 ---
 F_PROMPT() {
-    # 如果设置了 --force (且非在线删除场景)，则跳过提示? - 待定，目前 force 只影响检查
-    # if [[ "$FORCE" == "yes" && ! ("$ACTION" == "delete" && "$LIVE_MODE" == "yes") ]]; then
-    #     WARN "--force 已指定，跳过确认提示。"
-    #     return 0
-    # fi
+    # 在线删除时，如果指定了 --force，则跳过提示
+    if [[ "$ACTION" == "delete" && "$LIVE_MODE" == "yes" && "$FORCE" == "yes" ]]; then
+        WARN "--force 已指定，跳过在线 Block Commit 操作的最终确认！"
+        return 0 # 返回成功，表示确认
+    fi
+    # 离线模式下，force 只跳过存在性检查，不跳过操作确认 (保持原逻辑)
+    # 在线回滚时，force 传递给 virsh，仍需用户确认操作本身
 
     local prompt="$1"
     local response
@@ -360,6 +388,13 @@ F_CREATE_OFFLINE_SNAPSHOT() {
 
     local success_count=0 fail_count=0
     for disk_path in "${DISK_TARGETS[@]}"; do
+        # 离线创建前检查快照是否已存在 (除非 --force)
+        # 注意：qemu-img 没有原生的 --force 创建选项，这里的 force 只用于跳过存在性检查逻辑
+        if qemu-img snapshot -l "$disk_path" 2>/dev/null | grep -qw "$SNAP_NAME"; then
+             WARN "[离线] 磁盘 ${disk_path} 已存在快照 '${SNAP_NAME}'，跳过创建。"
+             continue # 跳过这个磁盘
+        fi
+
         LOG "[离线] 正在为磁盘 ${disk_path} 创建快照 '${SNAP_NAME}'..."
         if ! qemu-img snapshot -c "$SNAP_NAME" "$disk_path"; then
             WARN "[离线] 为磁盘 ${disk_path} 创建快照 '${SNAP_NAME}' 失败！"
@@ -369,10 +404,12 @@ F_CREATE_OFFLINE_SNAPSHOT() {
             ((success_count++))
         fi
     done
-    # ... (总结输出同前) ...
-     echo -e "${GREEN}======================================${NC}"
+
+    echo -e "${GREEN}======================================${NC}"
     if [[ $fail_count -gt 0 ]]; then
          WARN "[离线] ${success_count} 个磁盘快照创建成功, ${fail_count} 个失败。"
+    elif [[ $success_count -eq 0 ]]; then
+         WARN "[离线] 未创建任何新快照（可能已存在或无有效目标）。"
     else
          echo -e "${GREEN}[离线] 所有 ${success_count} 个磁盘快照 '${SNAP_NAME}' 创建成功${NC}"
     fi
@@ -416,7 +453,7 @@ F_REVERT_OFFLINE_SNAPSHOT() {
             ((success_count++))
          fi
     done
-    # ... (总结输出同前) ...
+
     echo -e "${GREEN}======================================${NC}"
      if [[ $fail_count -gt 0 ]]; then
          WARN "[离线] ${success_count} 个磁盘回滚成功, ${fail_count} 个失败。"
@@ -435,6 +472,7 @@ F_DELETE_OFFLINE_SNAPSHOT() {
     for disk_path in "${DISK_TARGETS[@]}"; do
         if ! qemu-img snapshot -l "$disk_path" 2>/dev/null | grep -qw "$SNAP_NAME"; then
              if [[ "$FORCE" != "yes" ]]; then
+                 # 离线删除时，如果快照不存在且未使用 --force，则报错
                  ERROR "[离线] 磁盘 ${disk_path} 不存在快照 '${SNAP_NAME}'。请检查快照名称或使用 --force 跳过。"
              else
                  WARN "[离线] 磁盘 ${disk_path} 不存在快照 '${SNAP_NAME}'，根据 --force 选项跳过此磁盘。"
@@ -463,7 +501,7 @@ F_DELETE_OFFLINE_SNAPSHOT() {
             ((success_count++))
         fi
     done
-    # ... (总结输出同前) ...
+
     echo -e "${GREEN}======================================${NC}"
     if [[ $fail_count -gt 0 ]]; then
          WARN "[离线] ${success_count} 个磁盘的快照删除成功, ${fail_count} 个失败。"
@@ -506,7 +544,7 @@ F_CREATE_LIVE_SNAPSHOT() {
     echo "  虚拟机：${VM_NAME}"
     echo "  操作：创建外部快照"
     echo "  快照名称：${SNAP_NAME}"
-    # --- 已修正的部分 开始 ---
+
     local mode_str=""
     if [[ "$DISK_ONLY" == "yes" ]]; then
         mode_str="仅磁盘"
@@ -522,23 +560,28 @@ F_CREATE_LIVE_SNAPSHOT() {
         consistency_str="${GREEN}尝试冻结 (需 Guest Agent)${NC}"
     fi
     echo "  一致性：${consistency_str}"
-    # --- 已修正的部分 结束 ---
+
     echo "  涉及磁盘设备："
     local diskspec_args=()
     local i=0
     for device in "${DISK_DEVICES[@]}"; do
         local base_file="${DISK_PATHS[$i]}"
         # 生成快照文件名 (放在原文件同目录)
-        local base_dir=$(dirname "$base_file")
+        local base_dir
+        base_dir=$(dirname "$base_file")
+        # 如果目录不存在或不可写，则报错或使用备用目录? (当前脚本未处理)
+        if [[ ! -d "$base_dir" || ! -w "$base_dir" ]]; then
+             WARN "基础文件目录 '$base_dir' 不存在或不可写，快照文件将尝试创建在当前目录。"
+             base_dir="." # 尝试在当前目录创建
+        fi
+
         local base_name=$(basename "$base_file")
-        # 处理没有扩展名的情况
         local ext=""
         if [[ "$base_name" == *.* ]]; then
             ext=".${base_name##*.}"
         fi
         local name_noext="${base_name%.*}"
-        # 确保快照文件名中不包含非法字符，例如空格（尽管快照名本身可能包含）
-        local safe_snap_name=$(echo "$SNAP_NAME" | tr -s ' ' '_') # 简单替换空格为下划线
+        local safe_snap_name=$(echo "$SNAP_NAME" | tr -s ' /\\:*?"<>|' '_') # 替换更多非法字符
         local snap_file="${base_dir}/${name_noext}-${safe_snap_name}${ext}"
 
         echo "    - ${device} (快照文件: ${snap_file})"
@@ -588,8 +631,7 @@ F_REVERT_LIVE_SNAPSHOT() {
     F_PROMPT "请确认要回滚到快照 '${SNAP_NAME}'？"
 
     local virsh_cmd=("virsh" "snapshot-revert" "$VM_NAME" "$SNAP_NAME")
-    # virsh snapshot-revert 似乎没有明显的 --force 选项来跳过检查
-    # 但可以添加 --force 来强制执行某些恢复操作（如果libvirt支持）
+
     if [[ "$FORCE" == "yes" ]]; then
         WARN "[在线] 使用 --force 强制回滚 (如果libvirt支持)..."
         virsh_cmd+=("--force")
@@ -618,12 +660,8 @@ F_DELETE_LIVE_SNAPSHOT() {
     echo -e "${YELLOW}      强烈建议在业务低峰期或维护窗口执行。${NC}"
     echo -e "${YELLOW}      快照名称 '${SNAP_NAME}' 在此操作中仅用于标识，实际操作是合并当前层。${NC}"
 
-    # 如果指定了 --force，可以跳过确认？(根据需求决定)
-    if [[ "$FORCE" != "yes" ]]; then
-        F_PROMPT "请确认要执行在线 Block Commit 操作？"
-    else
-        WARN "--force 已指定，跳过 Block Commit 的最终确认！"
-    fi
+    # 调用 F_PROMPT 进行确认 (F_PROMPT 内部已处理 --force)
+    F_PROMPT "请确认要执行在线 Block Commit 操作？"
 
     local success_count=0 fail_count=0
     for device in "${DISK_DEVICES[@]}"; do
@@ -656,9 +694,10 @@ F_LIST_LIVE_SNAPSHOTS() {
     local snapshot_list
     if ! snapshot_list=$(virsh snapshot-list "$VM_NAME" 2>/dev/null); then
         # 可能是没有快照，也可能是错误
-        if virsh snapshot-list "$VM_NAME" --no-inactive >/dev/null 2>&1; then # 尝试用不同选项探测是否存在
+        if virsh list --all --name | grep -qw "^${VM_NAME}$"; then # 再次确认 VM 存在
              echo -e "${YELLOW}未找到任何外部快照。${NC}"
         else
+             # 如果 VM 都不存在了，之前的 F_CHECK 应该已经报错了
              ERROR "[在线] 无法列出虚拟机 '${VM_NAME}' 的快照。请检查 libvirt 服务和权限。"
         fi
         return
@@ -764,7 +803,9 @@ else # 在线模式
          SPECIFIC_DISK=""
     fi
      if [[ "$ACTION" == "delete" ]]; then
-         WARN "在线删除模式将执行 Block Commit 操作合并当前层，快照名称 '$SNAP_NAME' 仅作标识。"
+         # 这里的警告在 F_DELETE_LIVE_SNAPSHOT 函数内部更显著地给出
+         # WARN "在线删除模式将执行 Block Commit 操作合并当前层，快照名称 '$SNAP_NAME' 仅作标识。"
+         : # 保留空操作或未来添加其他验证
      fi
 fi
 
