@@ -5,8 +5,8 @@
 # License: GNU GPLv3
 # Test On: Rocky Linux 9, CentOS 7/8, Ubuntu 20.04/22.04
 # Updated By: DeepSeek & Gemini
-# Update Date: 2025-04-19
-# Current Version: 1.2.5 # 更新版本号
+# Update Date: 2025-04-20
+# Current Version: 1.2.6 # 更新版本号
 # Description: KVM虚拟机多磁盘快照管理工具 (支持在线和离线模式)
 #
 # Version History:
@@ -16,6 +16,7 @@
 #                     - 添加 --disk-only, --no-quiesce 选项
 #                     - 在线删除实现为 blockcommit --active --pivot
 # 1.2.5 [2025-04-19] - 根据用户偏好调整 F_HELP 中用法格式，移除语法规范中的分组规则
+# 1.2.6 [2025-04-20] - 修正 F_GET_VM_DISKS_INFO 中 awk 解析 domblklist 输出的列索引错误
 #
 # Features:
 # - 支持在线 (live) 和离线 (offline) 虚拟机快照管理
@@ -32,7 +33,7 @@ SH_PATH=$( cd "$( dirname "$0" )" && pwd )
 cd ${SH_PATH}
 
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.2.5" # 版本号更新
+VERSION="1.2.6" # 版本号更新
 
 # 颜色定义
 RED='\033[0;31m'
@@ -113,19 +114,19 @@ F_CHECK_DEPS() {
 
 # 获取虚拟机磁盘信息 (设备名和当前源文件)
 # 输出格式: device:source_file (例如: vda:/var/lib/libvirt/images/vm1.qcow2)
+# --- 已修正 awk 命令 ---
 F_GET_VM_DISKS_INFO() {
     local vm_name=$1
     local disk_list_output
     if ! disk_list_output=$(virsh domblklist "$vm_name" --details 2>/dev/null); then
         ERROR "无法获取虚拟机 '${vm_name}' 的磁盘列表。请检查 libvirtd 服务状态和权限。"
     fi
-    # 过滤出类型为 'file' 或 'block' 的 'disk'，并提取 Target 和 Source
+    # 修正 awk 条件：检查 $1 是否为 file/block, $2 是否为 disk
     echo "$disk_list_output" | awk '
-        /disk/ && ($2 == "file" || $2 == "block") {
+        ($1 == "file" || $1 == "block") && $2 == "disk" {
             target = $3
             source = $4
-            # 尝试处理无 Source 的情况 (例如 CDROM)，虽然理论上不应匹配 disk
-            if (source == "-") source = "N/A"
+            if (source == "-") source = "N/A" # 处理无源的情况
             print target ":" source
         }'
 }
@@ -162,9 +163,10 @@ F_CHECK() {
     DISK_TARGETS=() # 清空数组
 
     local disk_info_list
-    disk_info_list=$(F_GET_VM_DISKS_INFO "$VM_NAME")
+    disk_info_list=$(F_GET_VM_DISKS_INFO "$VM_NAME") # 使用修正后的函数
     if [[ -z "$disk_info_list" ]]; then
-        ERROR "未能获取到虚拟机 '${VM_NAME}' 的任何磁盘信息。"
+        # 如果 awk 修正后仍然为空，可能是真的没有 disk 类型的设备
+        ERROR "未能从虚拟机 '${VM_NAME}' 获取到任何 'disk' 类型的设备信息。"
     fi
 
     if [[ "$LIVE_MODE" == "no" && -n "$SPECIFIC_DISK" ]]; then
