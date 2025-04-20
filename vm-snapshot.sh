@@ -6,7 +6,7 @@
 # Test On: Rocky Linux 9, CentOS 7/8, Ubuntu 20.04/22.04
 # Updated By: DeepSeek & Gemini
 # Update Date: 2025-04-19
-# Current Version: 1.2.4 # 更新版本号
+# Current Version: 1.2.5 # 更新版本号
 # Description: KVM虚拟机多磁盘快照管理工具 (支持在线和离线模式)
 #
 # Version History:
@@ -15,7 +15,7 @@
 # 1.2.0 [2025-04-18] - 新增在线快照功能 (--live)，使用virsh外部快照机制
 #                     - 添加 --disk-only, --no-quiesce 选项
 #                     - 在线删除实现为 blockcommit --active --pivot
-# 1.2.4 [2025-04-19] - 基于 v1.1.2 重新修订 F_HELP 帮助信息，确保内容完整、格式正确并集成在线模式说明
+# 1.2.5 [2025-04-19] - 根据用户偏好调整 F_HELP 中用法格式，移除语法规范中的分组规则
 #
 # Features:
 # - 支持在线 (live) 和离线 (offline) 虚拟机快照管理
@@ -32,7 +32,7 @@ SH_PATH=$( cd "$( dirname "$0" )" && pwd )
 cd ${SH_PATH}
 
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.2.4" # 版本号更新
+VERSION="1.2.5" # 版本号更新
 
 # 颜色定义
 RED='\033[0;31m'
@@ -252,7 +252,7 @@ F_CHECK() {
 
 # --- 帮助和版本函数 ---
 F_HELP() {
-    # 恢复使用 echo -e 并基于 1.1.2 版本内容进行扩充
+    # 按照用户偏好样式 2 更新
     echo -e "
 ${GREEN}用途：${NC}管理KVM虚拟机的磁盘快照（支持在线和离线模式）
 
@@ -295,24 +295,23 @@ ${GREEN}参数语法规范：${NC}
     <>          ：<val>           : 需替换的具体值（用户必须提供）
     %%          ：%val%           : 通配符（包含匹配，如%error%匹配error_code）
     |           ：val1|val2|<valn> : 多选一
-    {}          ：{-a <val>}      : 必须成组出现【选项+参数值】
-                ：{val1 val2}     : 必须成组的【参数值组合】，且必须按顺序提供
+    # {} 相关行已根据用户要求移除
 
 ${GREEN}用法：${NC}
     ${SCRIPT_NAME} -h|--help                                            # 显示帮助
     ${SCRIPT_NAME} -v|--version                                         # 显示版本
 
     # 离线模式 (VM需关机)
-    ${SCRIPT_NAME} -l -n <VM名> [--disk <qcow2路径>]                     # 列出内部快照
-    ${SCRIPT_NAME} -c <快照名> -n <VM名> [--disk <qcow2路径>]             # 创建内部快照
-    ${SCRIPT_NAME} -r <快照名> -n <VM名> [--disk <qcow2路径>] [--force]     # 回滚内部快照
-    ${SCRIPT_NAME} -d <快照名> -n <VM名> [--disk <qcow2路径>] [--force]     # 删除内部快照
+    ${SCRIPT_NAME} -l|--list -n|--name <VM名> [[--disk <qcow2路径>]|[--all-disks]]                     # 列出内部快照
+    ${SCRIPT_NAME} -c|--create <快照名> -n|--name <VM名> [[--disk <qcow2路径>]|[--all-disks]]             # 创建内部快照
+    ${SCRIPT_NAME} -r|--revert <快照名> -n|--name <VM名> [[--disk <qcow2路径>]|[--all-disks]] [--force]     # 回滚内部快照
+    ${SCRIPT_NAME} -d|--delete <快照名> -n|--name <VM名> [[--disk <qcow2路径>]|[--all-disks]] [--force]     # 删除内部快照
 
     # 在线模式 (VM需运行, 推荐带 Guest Agent)
-    ${SCRIPT_NAME} -l -n <VM名> --live                                   # 列出外部快照
-    ${SCRIPT_NAME} -c <快照名> -n <VM名> --live [--disk-only] [--no-quiesce] # 创建外部快照
-    ${SCRIPT_NAME} -r <快照名> -n <VM名> --live [--force]                 # 回滚外部快照
-    ${SCRIPT_NAME} -d <快照名> -n <VM名> --live [--force]                 # ${RED}在线合并当前层 (高危I/O操作)${NC}
+    ${SCRIPT_NAME} -l|--list -n|--name <VM名> --live                                   # 列出外部快照
+    ${SCRIPT_NAME} -c|--create <快照名> -n|--name <VM名> --live [--disk-only] [--no-quiesce] # 创建外部快照
+    ${SCRIPT_NAME} -r|--revert <快照名> -n|--name <VM名> --live [--force]                 # 回滚外部快照
+    ${SCRIPT_NAME} -d|--delete <快照名> -n|--name <VM名> --live [--force]                 # ${RED}在线合并当前层 (高危I/O操作)${NC}
 
 ${GREEN}参数说明：${NC}
     -h, --help           显示此帮助信息
@@ -340,7 +339,7 @@ ${GREEN}使用示例：${NC}
     ${SCRIPT_NAME} -l -n vm1 --disk /vm/vm1_disk1.qcow2              # 列出 vm1 指定磁盘的内部快照
     ${SCRIPT_NAME} -r pre_update -n vm1                               # 将 vm1 所有 qcow2 磁盘回滚到 pre_update 快照
     ${SCRIPT_NAME} -d pre_update -n vm1 --disk /vm/vm1_disk1.qcow2    # 删除 vm1 指定磁盘的 pre_update 快照
-    ${SCRIPT_NAME} -l -n vm1                                         # 列出 vm1 所有 qcow2 磁盘的内部快照
+    ${SCRIPT_NAME} -l -n vm1 --all-disks                             # 列出 vm1 所有 qcow2 磁盘的内部快照 (显式使用 --all-disks)
 
     # 在线模式示例 (假设虚拟机 vm2 正在运行且安装了 Guest Agent)
     ${SCRIPT_NAME} -c live_backup_$(date +%Y%m%d) -n vm2 --live --disk-only # 为 vm2 创建一个仅磁盘的在线快照 (推荐方式)
