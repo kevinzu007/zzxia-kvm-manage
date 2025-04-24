@@ -5,8 +5,8 @@
 # License: GNU GPLv3
 # Test On: Rocky Linux 9, CentOS 7/8, Ubuntu 20.04/22.04
 # Updated By: DeepSeek & Gemini
-# Update Date: 2025-04-23
-# Current Version: 1.2.7 # 更新版本号
+# Update Date: 2025-04-24
+# Current Version: 1.2.8 # 更新版本号
 # Description: KVM虚拟机多磁盘快照管理工具 (支持在线和离线模式)
 #
 # Version History:
@@ -18,6 +18,7 @@
 # 1.2.5 [2025-04-19] - 根据用户偏好调整 F_HELP 中用法格式，移除语法规范中的分组规则
 # 1.2.6 [2025-04-20] - 修正 F_GET_VM_DISKS_INFO 中 awk 解析 domblklist 输出的列索引错误
 # 1.2.7 [2025-04-23] - 在 F_HELP 中增加在线模式已知限制的说明 (内存快照和回滚问题)
+# 1.2.8 [2025-04-24] - 在 F_HELP 中添加彻底清理在线外部快照的说明
 #
 # Features:
 # - 支持在线 (live) 和离线 (offline) 虚拟机快照管理
@@ -34,7 +35,7 @@ SH_PATH=$( cd "$( dirname "$0" )" && pwd )
 cd ${SH_PATH}
 
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.2.7" # 版本号更新
+VERSION="1.2.8" # 版本号更新
 
 # 颜色定义
 RED='\033[0;31m'
@@ -255,7 +256,7 @@ F_CHECK() {
 
 # --- 帮助和版本函数 ---
 F_HELP() {
-    # 添加在线模式限制说明
+    # 添加在线模式限制说明和清理说明
     echo -e "
 ${GREEN}用途：${NC}管理KVM虚拟机的磁盘快照（支持在线和离线模式）
 
@@ -290,8 +291,12 @@ ${GREEN}注意：${NC}
     * ${RED}离线模式：必须在虚拟机关机状态下操作。${NC}
     * ${YELLOW}在线模式：${NC}
         - 建议安装并运行 qemu-guest-agent 以获得文件系统一致性快照。
-        - ${RED}在线删除 (-d --live):${NC} 执行 blockcommit 合并当前层，**会极大消耗I/O**，请务必在维护窗口操作！
+        - ${RED}在线删除 (-d --live):${NC} 此操作执行 blockcommit 合并当前层数据，**会极大消耗I/O**，请务必在维护窗口操作！
         - ${RED}在线回滚 (-r --live):${NC} 可能因 Bug 或限制失败，特别是回滚仅磁盘快照时。
+        - ${BLUE}彻底清理外部快照:${NC} 脚本的 '-d --live' (blockcommit) **不会**删除快照元数据和物理文件。要彻底清理：
+            1. ${YELLOW}(手动)${NC} 使用 'virsh snapshot-delete <VM名> <快照名> --metadata' 删除快照记录。
+            2. ${YELLOW}(手动)${NC} 确认虚拟机磁盘不再指向快照文件后 ('virsh domblklist <VM名>')，手动删除对应的 qcow2 快照文件。
+
     * 重要数据请提前备份，脚本会提示备份。
     * 需要 root 权限执行。
 
@@ -320,7 +325,7 @@ ${GREEN}用法：${NC}
     ${SCRIPT_NAME} -l|--list -n|--name <VM名> --live                                   # 列出外部快照
     ${SCRIPT_NAME} -c|--create <快照名> -n|--name <VM名> --live --disk-only [--no-quiesce] # ${GREEN}(推荐)${NC} 创建仅磁盘外部快照
     ${SCRIPT_NAME} -r|--revert <快照名> -n|--name <VM名> --live [--force]                 # ${RED}(慎用)${NC} 回滚外部快照 (可能失败)
-    ${SCRIPT_NAME} -d|--delete <快照名> -n|--name <VM名> --live [--force]                 # ${RED}(高危I/O)${NC} 在线合并当前层
+    ${SCRIPT_NAME} -d|--delete <快照名> -n|--name <VM名> --live [--force]                 # ${RED}(高危I/O, 仅合并数据)${NC} 在线合并当前层
 
 ${GREEN}参数说明：${NC}
     -h, --help           显示此帮助信息
@@ -328,7 +333,7 @@ ${GREEN}参数说明：${NC}
     -n, --name <VM名>    指定虚拟机名称 (必需)
     -c, --create <快照名> 创建快照 (${YELLOW}在线模式建议配合 --disk-only${NC})
     -r, --revert <快照名> 回滚到指定快照 (${RED}在线模式回滚可能失败${NC})
-    -d, --delete <快照名> 删除指定快照 (离线模式) / ${RED}在线合并当前活动的快照层${NC} (在线模式)
+    -d, --delete <快照名> 删除指定快照 (离线模式) / ${RED}在线合并当前活动的快照层${NC} (在线模式, ${RED}不删除元数据和文件!${NC})
     -l, --list           列出快照
     --live              启用在线快照模式 (使用 virsh 外部快照)
     --disk <路径>       (仅离线模式) 指定要操作的单个 qcow2 磁盘文件路径 (与 --all-disks 互斥)
@@ -356,6 +361,9 @@ ${GREEN}使用示例：${NC}
     # ${SCRIPT_NAME} -r live_backup_YYYYMMDD -n vm2 --live            # ${RED}在线回滚可能失败，请谨慎使用或先关机${NC}
     ${SCRIPT_NAME} -d any_name -n vm2 --live                         # ${RED}警告:${NC} 在线合并 vm2 当前活动的快照层 (高I/O操作, 'any_name' 仅用于标识)
     ${SCRIPT_NAME} -d any_name -n vm2 --live --force                 # ${RED}警告:${NC} 同上，但跳过最终确认提示直接执行合并
+    # ${BLUE}彻底清理在线快照 (在上述合并后):${NC}
+    # virsh snapshot-delete vm2 live_backup_YYYYMMDD --metadata      # 1. 手动删除元数据
+    # rm /path/to/vm2-live_backup_YYYYMMDD.qcow2                     # 2. 手动删除物理文件 (确认路径!)
 "
 }
 F_VERSION() {
@@ -567,7 +575,13 @@ F_CREATE_LIVE_SNAPSHOT() {
     else
         consistency_str="${GREEN}尝试冻结 (需 Guest Agent)${NC}"
     fi
-    echo "  一致性：${consistency_str}"
+    # 只有在 disk-only 模式下，一致性才有意义（因为内存模式不支持quiesce）
+    if [[ "$DISK_ONLY" == "yes" ]]; then
+        echo "  一致性：${consistency_str}"
+    else
+        echo "  一致性：${RED}N/A (内存快照不支持冻结)${NC}"
+    fi
+
 
     echo "  涉及磁盘设备："
     local diskspec_args=()
@@ -616,10 +630,10 @@ F_CREATE_LIVE_SNAPSHOT() {
         if [[ "$NO_QUIESCE" == "no" ]]; then
             virsh_cmd+=("--quiesce")
         fi
-    elif [[ "$NO_QUIESCE" == "no" ]]; then
-        # 如果创建内存快照，且用户未指定 --no-quiesce，则提示不能用 quiesce
-        WARN "创建包含内存的快照时，不能使用 --quiesce 选项。将忽略冻结尝试。"
-        # virsh_cmd+=("--quiesce") # 不再添加
+    # else # 创建内存快照时，不再尝试添加 --quiesce
+    #     if [[ "$NO_QUIESCE" == "no" ]]; then
+    #         WARN "创建包含内存的快照时，不能使用 --quiesce 选项。将忽略冻结尝试。"
+    #     fi
     fi
 
 
@@ -680,6 +694,7 @@ F_DELETE_LIVE_SNAPSHOT() {
     echo -e "${RED}      可能显著影响虚拟机 '${VM_NAME}' 的性能！${NC}"
     echo -e "${YELLOW}      强烈建议在业务低峰期或维护窗口执行。${NC}"
     echo -e "${YELLOW}      快照名称 '${SNAP_NAME}' 在此操作中仅用于标识，实际操作是合并当前层。${NC}"
+    echo -e "${BLUE}      此操作不会删除快照元数据或物理文件，需手动清理 (见 -h 帮助)。${NC}"
 
     # 调用 F_PROMPT 进行确认 (F_PROMPT 内部已处理 --force)
     F_PROMPT "请确认要执行在线 Block Commit 操作？"
@@ -829,10 +844,10 @@ else # 在线模式
          : # 保留空操作或未来添加其他验证
      fi
      # 在线模式下，如果尝试创建内存快照且未指定 --no-quiesce，给出早期警告
-     if [[ "$ACTION" == "create" && "$DISK_ONLY" == "no" && "$NO_QUIESCE" == "no" ]]; then
-         WARN "尝试创建包含内存的在线快照，且未指定 --no-quiesce。"
-         WARN "根据 libvirt 限制，这通常需要 --disk-only 或 --no-quiesce。脚本将自动忽略 --quiesce。"
-     fi
+     # if [[ "$ACTION" == "create" && "$DISK_ONLY" == "no" && "$NO_QUIESCE" == "no" ]]; then
+     #     WARN "尝试创建包含内存的在线快照，且未指定 --no-quiesce。"
+     #     WARN "根据 libvirt 限制，这通常需要 --disk-only 或 --no-quiesce。脚本将自动忽略 --quiesce。"
+     # fi
 fi
 
 
