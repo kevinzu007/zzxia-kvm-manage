@@ -6,7 +6,7 @@
 # Test On: Rocky Linux 9, CentOS 7/8, Ubuntu 20.04/22.04
 # Updated By: DeepSeek & Gemini
 # Update Date: 2025-04-24
-# Current Version: 1.2.8 # 更新版本号
+# Current Version: 1.2.9 # 更新版本号
 # Description: KVM虚拟机多磁盘快照管理工具 (支持在线和离线模式)
 #
 # Version History:
@@ -19,6 +19,7 @@
 # 1.2.6 [2025-04-20] - 修正 F_GET_VM_DISKS_INFO 中 awk 解析 domblklist 输出的列索引错误
 # 1.2.7 [2025-04-23] - 在 F_HELP 中增加在线模式已知限制的说明 (内存快照和回滚问题)
 # 1.2.8 [2025-04-24] - 在 F_HELP 中添加彻底清理在线外部快照的说明
+# 1.2.9 [2025-04-27] - 在 F_HELP 中恢复 {} 括号的参数说明
 #
 # Features:
 # - 支持在线 (live) 和离线 (offline) 虚拟机快照管理
@@ -35,7 +36,7 @@ SH_PATH=$( cd "$( dirname "$0" )" && pwd )
 cd ${SH_PATH}
 
 SCRIPT_NAME="${SH_NAME}"
-VERSION="1.2.8" # 版本号更新
+VERSION="1.2.9" # 版本号更新
 
 # 颜色定义
 RED='\033[0;31m'
@@ -303,13 +304,12 @@ ${GREEN}注意：${NC}
 ${GREEN}参数语法规范：${NC}
     无包围符号  ：-a              : 必选【选项】
                 ：val             : 必选【参数值】
-                ：val1 val2 -a -b : 必选【选项或参数值】，且不分先后顺序
+    {}          ：{-a val|-b val} : 同无包围符号一样，是必选【选项】，通常用于多个参数组合
     []          ：[-a]            : 可选【选项】
                 ：[val]           : 可选【参数值】
     <>          ：<val>           : 需替换的具体值（用户必须提供）
     %%          ：%val%           : 通配符（包含匹配，如%error%匹配error_code）
     |           ：val1|val2|<valn> : 多选一
-    # {} 相关行已根据用户要求移除
 
 ${GREEN}用法：${NC}
     ${SCRIPT_NAME} -h|--help                                            # 显示帮助
